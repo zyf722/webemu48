@@ -41,6 +41,33 @@ async function waitForState(expectedState, timeoutMs = 5000) {
   );
 }
 
+async function waitForShutdown(timeoutMs = 5000) {
+  const deadline = performance.now() + timeoutMs;
+
+  while (performance.now() < deadline) {
+    if (
+      moduleInstance._webemu48_state() === 0 &&
+      moduleInstance._webemu48_cpu_shutdn() === 1
+    ) {
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+
+  throw new Error(
+    `Timed out waiting for calculator reset; state=${moduleInstance._webemu48_state()}, ` +
+    `next=${moduleInstance._webemu48_next_state()}, ` +
+    `shutdn=${moduleInstance._webemu48_cpu_shutdn()}`
+  );
+}
+
+async function pressPowerOn() {
+  // real39gp-lc.kml Button 101 (ON) hit region center.
+  moduleInstance._webemu48_button_down(46, 837);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  moduleInstance._webemu48_button_up(46, 837);
+}
+
 function toKmlCoordinates(event) {
   const rect = calculator.getBoundingClientRect();
   return {
@@ -140,6 +167,10 @@ async function startCalculator() {
 
   writeLog("Waiting for calculator CPU…");
   await waitForState(0);
+  await waitForShutdown();
+
+  writeLog("Powering on calculator…");
+  await pressPowerOn();
 
   writeLog("Emulator started. The calculator image is now clickable.");
   running = true;
