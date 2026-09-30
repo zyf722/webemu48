@@ -2052,7 +2052,9 @@ static VOID PressButton(UINT nId)
 	if (!pButton[nId].bDown)				// button not pressed
 	{
 		pButton[nId].bDown = TRUE;
+#if !defined(WEBEMU48_WEB_PORT)
 		DrawButton(nId);
+#endif
 		if (pButton[nId].nIn)
 		{
 			KeyboardEvent(TRUE,pButton[nId].nOut,pButton[nId].nIn);
@@ -2074,7 +2076,9 @@ static VOID ReleaseButton(UINT nId)
 	if (pButton[nId].bDown)					// button not released
 	{
 		pButton[nId].bDown = FALSE;
+#if !defined(WEBEMU48_WEB_PORT)
 		DrawButton(nId);
+#endif
 		if (pButton[nId].nIn)
 		{
 			KeyboardEvent(FALSE,pButton[nId].nOut,pButton[nId].nIn);
@@ -2275,7 +2279,9 @@ VOID MouseButtonDownAt(UINT nFlags, DWORD x, DWORD y)
 					bClicking = TRUE;
 					uButtonClicked = i;
 					pButton[i].bDown = TRUE;
+#if !defined(WEBEMU48_WEB_PORT)
 					DrawButton(i);
+#endif
 				}
 				return;
 			}

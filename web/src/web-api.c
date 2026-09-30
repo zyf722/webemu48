@@ -283,8 +283,11 @@ int webemu48_lcd_refresh(void)
     const int headerRows = Chipset.d0size;
     const int mainRows = MAINSCREENHEIGHT;
 
-    EnterCriticalSection(&csLcdLock);
-
+    /*
+     * Browser-side LCD snapshots are intentionally lock-free. Waiting on the
+     * emulator thread's LCD critical section can block the browser event loop;
+     * a snapshot may tear by at most one emulated frame instead.
+     */
     for (int y = 0; y < sourceHeight; ++y) {
         int sourceX = 0;
         if (y < headerRows)
@@ -320,7 +323,6 @@ int webemu48_lcd_refresh(void)
         }
     }
 
-    LeaveCriticalSection(&csLcdLock);
     return TRUE;
 }
 
