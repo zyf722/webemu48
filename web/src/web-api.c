@@ -7,6 +7,7 @@
 
 #include "core/pch.h"
 #include "core/kml.h"
+#include "core/io.h"
 #include "emu.h"
 #include "win32-layer.h"
 
