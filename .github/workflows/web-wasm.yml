@@ -96,13 +96,97 @@ jobs:
             echo "No Chromium/Chrome binary found on runner"
             exit 1
           fi
-          timeout 40s "$CHROME" \
+
+          "$CHROME" \
             --headless=new \
             --no-sandbox \
             --disable-gpu \
             --disable-dev-shm-usage \
-            --dump-dom \
-            http://127.0.0.1:8000/smoke.html \
-            > /tmp/webemu48-smoke-dom.html || true
-          cat /tmp/webemu48-smoke-dom.html
-          grep -q 'data-smoke="pass"' /tmp/webemu48-smoke-dom.html
+            --remote-debugging-port=9222 \
+            --user-data-dir=/tmp/webemu48-chrome \
+            about:blank \
+            > /tmp/webemu48-chrome.log 2>&1 &
+          CHROME_PID=$!
+          trap 'kill "$CHROME_PID" 2>/dev/null || true' EXIT
+
+          for i in {1..80}; do
+            if curl -fsS http://127.0.0.1:9222/json/version >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:9222/json/version >/dev/null
+
+          node <<'NODE'
+          const targetUrl = "http://127.0.0.1:8000/smoke.html";
+          const targetResponse = await fetch(
+            "http://127.0.0.1:9222/json/new?" + encodeURIComponent(targetUrl),
+            { method: "PUT" }
+          );
+          if (!targetResponse.ok) {
+            throw new Error("Could not create Chromium target: " + targetResponse.status);
+          }
+
+          const target = await targetResponse.json();
+          const socket = new WebSocket(target.webSocketDebuggerUrl);
+          await new Promise((resolve, reject) => {
+            socket.addEventListener("open", resolve, { once: true });
+            socket.addEventListener("error", reject, { once: true });
+          });
+
+          let nextId = 1;
+          const pending = new Map();
+          socket.addEventListener("message", event => {
+            const message = JSON.parse(event.data);
+            if (!message.id) return;
+            const waiter = pending.get(message.id);
+            if (!waiter) return;
+            pending.delete(message.id);
+            if (message.error) waiter.reject(new Error(JSON.stringify(message.error)));
+            else waiter.resolve(message.result);
+          });
+
+          function cdp(method, params = {}) {
+            const id = nextId++;
+            return new Promise((resolve, reject) => {
+              pending.set(id, { resolve, reject });
+              socket.send(JSON.stringify({ id, method, params }));
+            });
+          }
+
+          await cdp("Runtime.enable");
+
+          const deadline = Date.now() + 35000;
+          let last = { state: "loading", text: "Loading WebAssembly module" };
+
+          while (Date.now() < deadline) {
+            const result = await cdp("Runtime.evaluate", {
+              expression: `JSON.stringify({
+                state: document.documentElement.dataset.smoke || "loading",
+                text: document.getElementById("status")?.textContent || ""
+              })`,
+              returnByValue: true
+            });
+
+            const value = result?.result?.value;
+            if (value) last = JSON.parse(value);
+
+            if (last.state === "pass") {
+              console.log(last.text);
+              socket.close();
+              process.exit(0);
+            }
+
+            if (last.state === "fail") {
+              console.error(last.text);
+              socket.close();
+              process.exit(1);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 250));
+          }
+
+          console.error("Timed out waiting for smoke result:", last);
+          socket.close();
+          process.exit(1);
+          NODE
