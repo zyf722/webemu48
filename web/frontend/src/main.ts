@@ -53,54 +53,19 @@ const INTERACTIVE_KEY_SELECTOR = [
   "#keyboard > g[id^=\"key-\"]"
 ].join(", ");
 
-const SVG_KEY_TO_KML_BUTTON_ID: Record<string, number> = {
-  F1: 11,
-  F2: 12,
-  F3: 13,
-  F4: 14,
-  F5: 15,
-  F6: 16,
-  "key-symb": 21,
-  "key-plot": 22,
-  "key-num": 23,
-  "key-home": 31,
-  "key-aplet": 32,
-  "key-views": 33,
-  "key-vars": 41,
-  "key-math": 42,
-  "key-deriv": 43,
-  "key-xt": 44,
-  "key-del": 45,
-  "key-sin": 51,
-  "key-cos": 52,
-  "key-tan": 53,
-  "key-ln": 54,
-  "key-log": 55,
-  "key-power2": 61,
-  "key-powery": 62,
-  "key-openparen": 63,
-  "key-closeparen": 64,
-  "key-divide": 65,
-  "key-comma": 71,
-  "key-seven": 72,
-  "key-eight": 73,
-  "key-nine": 74,
-  "key-times": 75,
-  "key-alpha": 81,
-  "key-four": 82,
-  "key-five": 83,
-  "key-six": 84,
-  "key-minus": 85,
-  "key-shift": 91,
-  "key-one": 92,
-  "key-two": 93,
-  "key-three": 94,
-  "key-plus": 95,
-  "key-on": 101,
-  "key-zero": 102,
-  "key-dot": 103,
-  "key-negative": 104,
-  "key-enter": 105,
+const FUNCTION_BUTTON_IDS = [11, 12, 13, 14, 15, 16] as const;
+const KEYBOARD_BUTTON_IDS = [
+  21, 22, 23,
+  31, 32, 33,
+  41, 42, 43, 44, 45,
+  51, 52, 53, 54, 55,
+  61, 62, 63, 64, 65,
+  71, 72, 73, 74, 75,
+  81, 82, 83, 84, 85,
+  91, 92, 93, 94, 95,
+  101, 102, 103, 104, 105
+] as const;
+const DIRECTION_BUTTON_IDS: Record<string, number> = {
   right: 110,
   down: 111,
   left: 112,
@@ -242,11 +207,34 @@ function installSkinSvg(svgText: string, model: ModelConfig): void {
   const lcdPlate = skin.querySelector<SVGElement>("#display rect");
   lcdPlate?.setAttribute("fill", LCD_BACKGROUND);
 
-  for (const [svgId, buttonId] of Object.entries(SVG_KEY_TO_KML_BUTTON_ID)) {
-    skin.querySelector(`#${svgId}`)?.setAttribute(
-      "data-kml-button-id",
-      String(buttonId)
+  const functionKeys = Array.from(
+    skin.querySelectorAll<SVGElement>("#six-function-keys > g[id^='F']")
+  );
+  const keyboardKeys = Array.from(
+    skin.querySelectorAll<SVGElement>("#keyboard > g[id^='key-']")
+  );
+
+  if (functionKeys.length !== FUNCTION_BUTTON_IDS.length) {
+    throw new Error(
+      `${model.label} SVG has ${functionKeys.length} function keys; expected ${FUNCTION_BUTTON_IDS.length}`
     );
+  }
+  if (keyboardKeys.length !== KEYBOARD_BUTTON_IDS.length) {
+    throw new Error(
+      `${model.label} SVG has ${keyboardKeys.length} physical keyboard keys; expected ${KEYBOARD_BUTTON_IDS.length}`
+    );
+  }
+
+  functionKeys.forEach((key, index) => {
+    key.dataset.kmlButtonId = String(FUNCTION_BUTTON_IDS[index]);
+  });
+  keyboardKeys.forEach((key, index) => {
+    key.dataset.kmlButtonId = String(KEYBOARD_BUTTON_IDS[index]);
+  });
+  for (const [svgId, buttonId] of Object.entries(DIRECTION_BUTTON_IDS)) {
+    const key = skin.querySelector<SVGElement>(`#${svgId}`);
+    if (!key) throw new Error(`${model.label} SVG is missing direction key #${svgId}`);
+    key.dataset.kmlButtonId = String(buttonId);
   }
 }
 
@@ -294,46 +282,47 @@ function findVisualKey(target: EventTarget | null): Element | null {
   return key && skin.contains(key) ? key : null;
 }
 
-function visualKeyIdForEvent(event: KeyboardEvent): string | null {
-  const digits: Record<string, string> = {
-    "0": "key-zero",
-    "1": "key-one",
-    "2": "key-two",
-    "3": "key-three",
-    "4": "key-four",
-    "5": "key-five",
-    "6": "key-six",
-    "7": "key-seven",
-    "8": "key-eight",
-    "9": "key-nine"
-  };
+function buttonIdForKeyboardEvent(event: KeyboardEvent): number | null {
+  if (/^F[1-6]$/.test(event.key)) {
+    return 10 + Number(event.key.slice(1));
+  }
 
-  if (digits[event.key]) return digits[event.key];
-  if (/^F[1-6]$/.test(event.key)) return event.key;
+  const digitButtons: Record<string, number> = {
+    "0": 102,
+    "1": 92,
+    "2": 93,
+    "3": 94,
+    "4": 82,
+    "5": 83,
+    "6": 84,
+    "7": 72,
+    "8": 73,
+    "9": 74
+  };
+  if (event.key in digitButtons) return digitButtons[event.key];
 
   switch (event.key) {
-    case "+": return "key-plus";
-    case "-": return "key-minus";
-    case "*": return "key-times";
-    case "/": return "key-divide";
-    case ".": return "key-dot";
-    case ",": return "key-comma";
-    case "Enter": return "key-enter";
-    case "Backspace": return "key-del";
-    case "Escape": return "key-on";
-    case "ArrowLeft": return "left";
-    case "ArrowUp": return "up";
-    case "ArrowRight": return "right";
-    case "ArrowDown": return "down";
+    case "+": return 95;
+    case "-": return 85;
+    case "*": return 75;
+    case "/": return 65;
+    case ".": return 103;
+    case ",":
+      return selectedModel().rom === "rom.39g" ? 71 : null;
+    case "Enter": return 105;
+    case "Backspace": return 45;
+    case "Escape": return 101;
+    case "ArrowLeft": return 112;
+    case "ArrowUp": return 113;
+    case "ArrowRight": return 110;
+    case "ArrowDown": return 111;
     default: return null;
   }
 }
 
-function visualKeyForEvent(event: KeyboardEvent): Element | null {
-  const id = visualKeyIdForEvent(event);
-  return id ? skin.querySelector(`#${id}`) : null;
+function visualKeyForButtonId(buttonId: number): Element | null {
+  return skin.querySelector(`[data-kml-button-id="${buttonId}"]`);
 }
-
 function ensureDirectory(fs: EmuFs, path: string): void {
   try { fs.mkdir(path); }
   catch (error) {
@@ -394,7 +383,8 @@ function pointerDown(event: PointerEvent): void {
   calculator.focus({ preventScroll: true });
 
   const visualKey = findVisualKey(event.target);
-  const buttonId = visualKey ? SVG_KEY_TO_KML_BUTTON_ID[visualKey.id] : undefined;
+  const buttonIdText = visualKey?.getAttribute("data-kml-button-id");
+  const buttonId = buttonIdText ? Number(buttonIdText) : undefined;
   let point: { x: number; y: number } | null = null;
   let accepted = false;
 
@@ -439,30 +429,24 @@ function releasePointer(event: PointerEvent): void {
 function keyDown(event: KeyboardEvent): void {
   if (!running || !moduleInstance || event.repeat) return;
 
-  const svgId = visualKeyIdForEvent(event);
-  if (!svgId) return;
-  const buttonId = SVG_KEY_TO_KML_BUTTON_ID[svgId];
-  if (buttonId === undefined || activeKeyboardButtonIds.has(buttonId)) return;
-
+  const buttonId = buttonIdForKeyboardEvent(event);
+  if (buttonId === null || activeKeyboardButtonIds.has(buttonId)) return;
   if (!moduleInstance._webemu48_button_id_down(buttonId)) return;
 
   activeKeyboardButtonIds.add(buttonId);
-  const visualKey = skin.querySelector(`#${svgId}`);
+  const visualKey = visualKeyForButtonId(buttonId);
   if (visualKey) {
     visualKey.classList.add("is-keyboard-pressed");
     activeKeyboardVisuals.set(buttonId, visualKey);
   }
-
   event.preventDefault();
 }
 
 function keyUp(event: KeyboardEvent): void {
   if (!running || !moduleInstance) return;
 
-  const svgId = visualKeyIdForEvent(event);
-  if (!svgId) return;
-  const buttonId = SVG_KEY_TO_KML_BUTTON_ID[svgId];
-  if (buttonId === undefined || !activeKeyboardButtonIds.has(buttonId)) return;
+  const buttonId = buttonIdForKeyboardEvent(event);
+  if (buttonId === null || !activeKeyboardButtonIds.has(buttonId)) return;
 
   moduleInstance._webemu48_button_id_up(buttonId);
   activeKeyboardVisuals.get(buttonId)?.classList.remove("is-keyboard-pressed");
