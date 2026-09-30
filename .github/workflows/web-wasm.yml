@@ -1,0 +1,35 @@
+name: WebAssembly smoke
+
+on:
+  push:
+    branches:
+      - web-port
+    paths:
+      - "web/**"
+      - "app/src/main/cpp/**"
+      - ".github/workflows/web-wasm.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "app/src/main/cpp/**"
+      - ".github/workflows/web-wasm.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  portability-probe:
+    runs-on: ubuntu-latest
+    container:
+      image: emscripten/emsdk:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Emscripten version
+        run: emcc --version
+
+      - name: Configure compile-only probe
+        run: emcmake cmake -S web -B build/web
+
+      - name: Build compile-only probe
+        run: cmake --build build/web --parallel 2 --verbose
