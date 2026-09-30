@@ -374,6 +374,48 @@ unsigned int webemu48_pc(void)
 }
 
 WEBEMU48_EXPORT
+unsigned int webemu48_cycles_low(void)
+{
+    return (unsigned int) (Chipset.cycles & 0xffffffffu);
+}
+
+WEBEMU48_EXPORT
+int webemu48_inte(void)
+{
+    return Chipset.inte ? 1 : 0;
+}
+
+WEBEMU48_EXPORT
+int webemu48_intk(void)
+{
+    return Chipset.intk ? 1 : 0;
+}
+
+WEBEMU48_EXPORT
+int webemu48_softint(void)
+{
+    return Chipset.SoftInt ? 1 : 0;
+}
+
+WEBEMU48_EXPORT
+unsigned int webemu48_in_register(void)
+{
+    return (unsigned int) Chipset.in;
+}
+
+WEBEMU48_EXPORT
+unsigned int webemu48_timer1_ctrl(void)
+{
+    return (unsigned int) Chipset.IORam[TIMER1_CTRL];
+}
+
+WEBEMU48_EXPORT
+unsigned int webemu48_timer2_ctrl(void)
+{
+    return (unsigned int) Chipset.IORam[TIMER2_CTRL];
+}
+
+WEBEMU48_EXPORT
 unsigned int webemu48_ir15x(void)
 {
     return (unsigned int) Chipset.IR15X;

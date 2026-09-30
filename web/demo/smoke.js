@@ -96,16 +96,25 @@ try {
    * Exercise the real KML ON key hit region rather than forcing emulator state.
    */
   await sleep(250);
+  const cyclesBeforeOn = moduleInstance._webemu48_cycles_low() >>> 0;
+  const pcBeforeOn = moduleInstance._webemu48_pc() >>> 0;
   moduleInstance._webemu48_button_down(46, 837);
-  await sleep(120);
+  await sleep(300);
   moduleInstance._webemu48_button_up(46, 837);
 
-  const deadline = performance.now() + 12000;
+  const deadline = performance.now() + 15000;
   let lastState = moduleInstance._webemu48_state();
+  const pcSamples = [];
+  const cycleSamples = [];
 
   while (performance.now() < deadline) {
     await sleep(100);
     lastState = moduleInstance._webemu48_state();
+
+    if (pcSamples.length < 80) {
+      pcSamples.push(moduleInstance._webemu48_pc() >>> 0);
+      cycleSamples.push(moduleInstance._webemu48_cycles_low() >>> 0);
+    }
 
     if (!moduleInstance._webemu48_lcd_refresh()) continue;
 
@@ -132,7 +141,19 @@ try {
       nextState: moduleInstance._webemu48_next_state(),
       displayOn: moduleInstance._webemu48_display_on(),
       shutdn: moduleInstance._webemu48_cpu_shutdn(),
-      pc: moduleInstance._webemu48_pc(),
+      pc: moduleInstance._webemu48_pc() >>> 0,
+      pcBeforeOn,
+      pcSamples,
+      uniquePcSamples: new Set(pcSamples).size,
+      cyclesBeforeOn,
+      cyclesNow: moduleInstance._webemu48_cycles_low() >>> 0,
+      cycleSamples,
+      inte: moduleInstance._webemu48_inte(),
+      intk: moduleInstance._webemu48_intk(),
+      softInt: moduleInstance._webemu48_softint(),
+      inRegister: moduleInstance._webemu48_in_register(),
+      timer1Ctrl: moduleInstance._webemu48_timer1_ctrl(),
+      timer2Ctrl: moduleInstance._webemu48_timer2_ctrl(),
       ir15x: moduleInstance._webemu48_ir15x(),
       rawMin: moduleInstance._webemu48_lcd_raw_min(),
       rawMax: moduleInstance._webemu48_lcd_raw_max(),
