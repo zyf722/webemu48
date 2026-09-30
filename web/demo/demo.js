@@ -56,13 +56,23 @@ async function startCalculator() {
 
   writeLog(`ROM loaded into memory: ${bytes.byteLength} bytes`);
 
-  if (!moduleInstance._webemu48_init("/calculators/")) {
+  if (!moduleInstance.ccall(
+    "webemu48_init",
+    "number",
+    ["string"],
+    ["/calculators/"]
+  )) {
     writeLog("webemu48_init() failed.");
     startButton.disabled = false;
     return;
   }
 
-  if (!moduleInstance._webemu48_new_document("real39gp-lc.kml", "/calculators/")) {
+  if (!moduleInstance.ccall(
+    "webemu48_new_document",
+    "number",
+    ["string", "string"],
+    ["real39gp-lc.kml", "/calculators/"]
+  )) {
     writeLog("NewDocument() failed. Check the selected ROM.");
     startButton.disabled = false;
     return;
