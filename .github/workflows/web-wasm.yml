@@ -37,10 +37,10 @@ jobs:
       - name: Assemble browser demo
         run: |
           mkdir -p dist
-          cp build/web/webemu48.js dist/
-          cp build/web/webemu48.wasm dist/
-          cp build/web/webemu48.worker.js dist/
-          cp build/web/webemu48.data dist/
+          cp build/web/webemu48.* dist/
+          test -f dist/webemu48.js
+          test -f dist/webemu48.wasm
+          test -f dist/webemu48.data
           cp web/demo/index.html dist/
           cp web/demo/demo.js dist/
           cp web/demo/serve.py dist/
