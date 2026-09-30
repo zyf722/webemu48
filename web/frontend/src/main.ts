@@ -43,6 +43,15 @@ type RuntimeFactory = (options: {
 
 const VIEWBOX_WIDTH = 665;
 const VIEWBOX_HEIGHT = 1340;
+const LCD_BACKGROUND = "#a8c0b0";
+const INTERACTIVE_KEY_SELECTOR = [
+  "#six-function-keys > g[id^=\"F\"]",
+  "#navigation > #up",
+  "#navigation > #left",
+  "#navigation > #right",
+  "#navigation > #down",
+  "#keyboard > g[id^=\"key-\"]"
+].join(", ");
 
 const MODELS: Record<ModelId, ModelConfig> = {
   "39gp": {
@@ -101,7 +110,7 @@ const romName = requiredElement<HTMLElement>("rom-name");
 const romHint = requiredElement<HTMLElement>("rom-hint");
 const startButton = requiredElement<HTMLButtonElement>("start");
 const calculator = requiredElement<HTMLElement>("calculator");
-const skin = requiredElement<HTMLImageElement>("skin");
+const skin = requiredElement<HTMLElement>("skin");
 const canvas = requiredElement<HTMLCanvasElement>("lcd");
 const ctx = canvas.getContext("2d", { alpha: false })!;
 const runtimeBadge = requiredElement<HTMLElement>("runtime-badge");
@@ -116,7 +125,11 @@ let running = false;
 let activePointerId: number | null = null;
 let activePressPoint: { x: number; y: number } | null = null;
 let frameImageData: ImageData | null = null;
+let activePointerVisualKey: Element | null = null;
+let skinLoadGeneration = 0;
+const skinCache = new Map<string, string>();
 const activeVirtualKeys = new Set<number>();
+const activeKeyboardVisuals = new Map<number, Element>();
 
 function selectedModel(): ModelConfig {
   return MODELS[modelSelect.value as ModelId] ?? MODELS["39gp"];
@@ -150,20 +163,113 @@ function formatMiB(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(bytes % 1_048_576 === 0 ? 0 : 2)} MiB`;
 }
 
-function applyModelVisual(): void {
+function paintLcdBackground(model: ModelConfig): void {
+  canvas.width = 131;
+  canvas.height = model.lcdHeight;
+  frameImageData = null;
+  ctx.fillStyle = LCD_BACKGROUND;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function installSkinSvg(svgText: string, model: ModelConfig): void {
+  const documentSvg = new DOMParser().parseFromString(svgText, "image/svg+xml");
+  const svg = documentSvg.documentElement;
+  if (svg.nodeName.toLowerCase() !== "svg") {
+    throw new Error(`Invalid SVG skin for ${model.label}`);
+  }
+
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", "100%");
+  svg.setAttribute("aria-hidden", "true");
+  skin.replaceChildren(document.importNode(svg, true));
+  skin.dataset.skin = model.skin;
+
+  const lcdPlate = skin.querySelector<SVGElement>("#display rect");
+  lcdPlate?.setAttribute("fill", LCD_BACKGROUND);
+}
+
+async function applyModelVisual(): Promise<void> {
+  const generation = ++skinLoadGeneration;
   const model = selectedModel();
+
   calculator.style.aspectRatio = `${VIEWBOX_WIDTH} / ${VIEWBOX_HEIGHT}`;
   calculator.setAttribute("aria-label", `${model.label} calculator`);
-  skin.src = assetUrl(`skins/${model.skin}`);
-  skin.alt = `${model.label} calculator skin`;
 
   canvas.style.left = `${(model.display.x / VIEWBOX_WIDTH) * 100}%`;
   canvas.style.top = `${(model.display.y / VIEWBOX_HEIGHT) * 100}%`;
   canvas.style.width = `${(model.display.width / VIEWBOX_WIDTH) * 100}%`;
   canvas.style.height = `${(model.display.height / VIEWBOX_HEIGHT) * 100}%`;
+  paintLcdBackground(model);
 
   startButton.textContent = `Start ${model.label}`;
   romHint.textContent = `Expected ${formatMiB(model.romSize)} ${model.rom} family`;
+
+  try {
+    let svgText = skinCache.get(model.skin);
+    if (!svgText) {
+      const response = await fetch(assetUrl(`skins/${model.skin}`));
+      if (!response.ok) {
+        throw new Error(`Skin fetch failed: ${response.status}`);
+      }
+      svgText = await response.text();
+      skinCache.set(model.skin, svgText);
+    }
+
+    if (generation !== skinLoadGeneration) return;
+    installSkinSvg(svgText, model);
+  } catch (error) {
+    if (generation !== skinLoadGeneration) return;
+    skin.replaceChildren();
+    delete skin.dataset.skin;
+    const message = error instanceof Error ? error.message : String(error);
+    writeLog(`Could not load ${model.label} SVG skin: ${message}`);
+  }
+}
+
+function findVisualKey(target: EventTarget | null): Element | null {
+  if (!(target instanceof Element)) return null;
+  const key = target.closest(INTERACTIVE_KEY_SELECTOR);
+  return key && skin.contains(key) ? key : null;
+}
+
+function visualKeyIdForEvent(event: KeyboardEvent): string | null {
+  const digits: Record<string, string> = {
+    "0": "key-zero",
+    "1": "key-one",
+    "2": "key-two",
+    "3": "key-three",
+    "4": "key-four",
+    "5": "key-five",
+    "6": "key-six",
+    "7": "key-seven",
+    "8": "key-eight",
+    "9": "key-nine"
+  };
+
+  if (digits[event.key]) return digits[event.key];
+  if (/^F[1-6]$/.test(event.key)) return event.key;
+
+  switch (event.key) {
+    case "+": return "key-plus";
+    case "-": return "key-minus";
+    case "*": return "key-times";
+    case "/": return "key-divide";
+    case ".": return "key-dot";
+    case ",": return "key-comma";
+    case "Enter": return "key-enter";
+    case "Backspace": return "key-del";
+    case "Escape": return "key-on";
+    case "ArrowLeft": return "left";
+    case "ArrowUp": return "up";
+    case "ArrowRight": return "right";
+    case "ArrowDown": return "down";
+    default: return null;
+  }
+}
+
+function visualKeyForEvent(event: KeyboardEvent): Element | null {
+  const id = visualKeyIdForEvent(event);
+  return id ? skin.querySelector(`#${id}`) : null;
 }
 
 function ensureDirectory(fs: EmuFs, path: string): void {
@@ -224,17 +330,27 @@ function pointerDown(event: PointerEvent): void {
   calculator.focus({ preventScroll: true });
   const point = toKmlCoordinates(event);
   if (!moduleInstance._webemu48_button_down(point.x, point.y)) return;
+
   activePointerId = event.pointerId;
   activePressPoint = point;
+  activePointerVisualKey = findVisualKey(event.target);
+  activePointerVisualKey?.classList.add("is-pointer-pressed");
+
   calculator.setPointerCapture?.(event.pointerId);
   event.preventDefault();
 }
 
 function releasePointer(event: PointerEvent): void {
   if (!running || !moduleInstance || event.pointerId !== activePointerId) return;
-  if (activePressPoint) moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
+
+  if (activePressPoint) {
+    moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
+  }
+  activePointerVisualKey?.classList.remove("is-pointer-pressed");
+
   activePointerId = null;
   activePressPoint = null;
+  activePointerVisualKey = null;
   event.preventDefault();
 }
 
@@ -264,7 +380,14 @@ function keyDown(event: KeyboardEvent): void {
   if (!running || !moduleInstance || event.repeat) return;
   const virtKey = virtualKeyForEvent(event);
   if (virtKey === null || activeVirtualKeys.has(virtKey)) return;
+
   activeVirtualKeys.add(virtKey);
+  const visualKey = visualKeyForEvent(event);
+  if (visualKey) {
+    visualKey.classList.add("is-keyboard-pressed");
+    activeKeyboardVisuals.set(virtKey, visualKey);
+  }
+
   moduleInstance._webemu48_key_down(virtKey);
   event.preventDefault();
 }
@@ -273,14 +396,21 @@ function keyUp(event: KeyboardEvent): void {
   if (!running || !moduleInstance) return;
   const virtKey = virtualKeyForEvent(event);
   if (virtKey === null || !activeVirtualKeys.has(virtKey)) return;
+
   moduleInstance._webemu48_key_up(virtKey);
+  activeKeyboardVisuals.get(virtKey)?.classList.remove("is-keyboard-pressed");
+  activeKeyboardVisuals.delete(virtKey);
   activeVirtualKeys.delete(virtKey);
   event.preventDefault();
 }
 
 function releaseKeyboard(): void {
   if (!moduleInstance) return;
-  for (const virtKey of activeVirtualKeys) moduleInstance._webemu48_key_up(virtKey);
+  for (const virtKey of activeVirtualKeys) {
+    moduleInstance._webemu48_key_up(virtKey);
+    activeKeyboardVisuals.get(virtKey)?.classList.remove("is-keyboard-pressed");
+  }
+  activeKeyboardVisuals.clear();
   activeVirtualKeys.clear();
 }
 
@@ -430,7 +560,7 @@ async function bootRuntime(): Promise<void> {
   log.textContent = "Runtime ready. Select a model and ROM image.";
 }
 
-modelSelect.addEventListener("change", applyModelVisual);
+modelSelect.addEventListener("change", () => void applyModelVisual());
 romInput.addEventListener("change", () => {
   const file = romInput.files?.[0];
   romName.textContent = file ? `${file.name} · ${formatMiB(file.size)}` : "No ROM selected";
@@ -443,8 +573,10 @@ calculator.addEventListener("pointercancel", releasePointer);
 calculator.addEventListener("lostpointercapture", event => {
   if (moduleInstance && event.pointerId === activePointerId && activePressPoint) {
     moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
+    activePointerVisualKey?.classList.remove("is-pointer-pressed");
     activePointerId = null;
     activePressPoint = null;
+    activePointerVisualKey = null;
   }
 });
 calculator.addEventListener("keydown", keyDown);
@@ -452,7 +584,7 @@ calculator.addEventListener("keyup", keyUp);
 calculator.addEventListener("blur", releaseKeyboard);
 window.addEventListener("blur", releaseKeyboard);
 
-applyModelVisual();
+void applyModelVisual();
 
 bootRuntime().catch(error => {
   console.error(error);

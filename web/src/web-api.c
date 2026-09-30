@@ -340,7 +340,18 @@ int webemu48_lcd_refresh(void)
                 green = entries[index].peGreen;
                 blue = entries[index].peBlue;
             } else {
-                red = green = blue = index ? 0 : 255;
+                /*
+                 * Match the default LCD background from the bundled HP ARM
+                 * KML files instead of flashing pure white before a palette
+                 * has been realized. Lit pixels fall back to black.
+                 */
+                if (index) {
+                    red = green = blue = 0;
+                } else {
+                    red = 168;
+                    green = 192;
+                    blue = 176;
+                }
             }
 
             BYTE *destination =
