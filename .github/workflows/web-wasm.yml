@@ -31,6 +31,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check browser JavaScript syntax
+        run: |
+          for script in web/demo/*.js; do
+            node --check "$script"
+          done
+
       - name: Show Emscripten version
         run: emcc --version
 

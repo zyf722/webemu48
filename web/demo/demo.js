@@ -83,6 +83,17 @@ let moduleInstance = null;
 let running = false;
 let activePointerId = null;
 let activePressPoint = null;
+const activeVirtualKeys = new Set();
+
+const FORWARDED_VIRTUAL_KEYS = new Set([
+  8, 9, 13, 16, 17, 27, 32, 33, 34, 35, 36, 37, 38, 39, 40, 45, 46,
+  48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+  65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77,
+  78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+  96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 109, 110, 111,
+  112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123,
+  186, 187, 188, 189, 190, 191, 192, 219, 220, 221, 222
+]);
 
 function selectedModel() {
   return MODELS[modelSelect.value] || MODELS["39gp"];
@@ -191,6 +202,8 @@ function toKmlCoordinates(event) {
 function pointerDown(event) {
   if (!running || activePointerId !== null) return;
 
+  calculator.focus({ preventScroll: true });
+
   const point = toKmlCoordinates(event);
   if (!moduleInstance._webemu48_button_down(point.x, point.y)) return;
 
@@ -209,6 +222,43 @@ function pointerUp(event) {
   activePointerId = null;
   activePressPoint = null;
   event.preventDefault();
+}
+
+function browserVirtualKey(event) {
+  return event.keyCode || event.which || 0;
+}
+
+function calculatorKeyDown(event) {
+  if (!running || event.repeat) return;
+
+  const virtKey = browserVirtualKey(event);
+  if (!FORWARDED_VIRTUAL_KEYS.has(virtKey) || activeVirtualKeys.has(virtKey)) return;
+
+  activeVirtualKeys.add(virtKey);
+  moduleInstance._webemu48_key_down(virtKey);
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function calculatorKeyUp(event) {
+  if (!running) return;
+
+  const virtKey = browserVirtualKey(event);
+  if (!activeVirtualKeys.has(virtKey)) return;
+
+  moduleInstance._webemu48_key_up(virtKey);
+  activeVirtualKeys.delete(virtKey);
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function releaseCalculatorKeys() {
+  if (!moduleInstance || activeVirtualKeys.size === 0) return;
+
+  for (const virtKey of activeVirtualKeys) {
+    moduleInstance._webemu48_key_up(virtKey);
+  }
+  activeVirtualKeys.clear();
 }
 
 async function bootModule() {
@@ -346,6 +396,10 @@ function renderLoop() {
 calculator.addEventListener("pointerdown", pointerDown);
 calculator.addEventListener("pointerup", pointerUp);
 calculator.addEventListener("pointercancel", pointerUp);
+calculator.addEventListener("keydown", calculatorKeyDown);
+calculator.addEventListener("keyup", calculatorKeyUp);
+calculator.addEventListener("blur", releaseCalculatorKeys);
+window.addEventListener("blur", releaseCalculatorKeys);
 calculator.addEventListener("lostpointercapture", event => {
   if (event.pointerId === activePointerId && running) {
     if (activePressPoint) {

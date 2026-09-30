@@ -35,6 +35,10 @@
       user-select: none;
       touch-action: none;
     }
+    #calculator:focus-visible {
+      outline: 2px solid CanvasText;
+      outline-offset: 4px;
+    }
     #skin {
       display: block;
       width: 100%;
@@ -102,15 +106,17 @@
   </div>
 
   <div class="calculator-wrap">
-    <div id="calculator" aria-label="Clickable HP 39g+ emulator">
+    <div id="calculator" tabindex="0" aria-label="Clickable HP 39g+ emulator">
       <img id="skin" src="./real39gp-lc.png" alt="HP 39g+ emulator skin" draggable="false" />
       <canvas id="lcd" width="131" height="64"></canvas>
     </div>
   </div>
 
   <p class="muted">
-    Temporary skin from the upstream Emu48 Android assets (Eric Rechlin).
-    The final UI will be replaced by the project's own calculator SVG.
+    Click or tap the calculator to focus it. While focused, the computer keyboard follows the
+    upstream Emu48 mapping (for example F1–F12, digits, letters, arrows, Enter, Backspace,
+    Shift and Ctrl). Temporary skins come from the upstream Emu48 Android assets (Eric Rechlin);
+    the final UI will be replaced by the project's own calculator SVG.
   </p>
 
   <pre id="log">Waiting for isolated browser context…</pre>
