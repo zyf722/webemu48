@@ -50,10 +50,9 @@ to use.
 - `app/src/main/assets/calculators/` — KML/patch resources used by the core and tests.
 
 The repository was derived from Emu48 for Android, which in turn ports the
-Windows Emu48/Emu48+ codebase. Android application/UI build files have been
-removed from this Web-focused branch; some native files still retain historical
-Android-oriented names where the Web port currently reuses their platform
-implementation.
+Windows Emu48/Emu48+ codebase. The Android application/UI build has been
+removed from this Web-focused branch; browser host and platform shims now live
+under `web/src/`.
 
 ## Licenses
 

@@ -5,9 +5,8 @@ project(webemu48_portability_probe LANGUAGES C)
 set(EMU48_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/../app/src/main/cpp")
 set(EMU48_CORE_DIR "${EMU48_CPP_DIR}/core")
 
-# Compile the same Emu48 core translation units used by the Android build.
-# Platform implementations (win32-layer.c, android-layer.c, android-emu.c and
-# emu-jni.c) are intentionally excluded from this target.
+# Compile the inherited Emu48 core plus the browser-specific host/platform
+# shims. The original Android application shell is not part of this branch.
 add_library(webemu48_core_probe OBJECT
     "${EMU48_CORE_DIR}/apple.c"
     "${EMU48_CORE_DIR}/ddeserv.c"
@@ -38,8 +37,8 @@ add_library(webemu48_core_probe OBJECT
     "${EMU48_CORE_DIR}/symbfile.c"
     "${EMU48_CORE_DIR}/timer.c"
     "${EMU48_CPP_DIR}/win32-layer.c"
-    "${EMU48_CPP_DIR}/android-emu.c"
-    "${EMU48_CPP_DIR}/android-layer.c"
+    src/emu-host.c
+    src/core-stubs.c
     src/web-platform.c
     src/web-api.c
     src/portability_probe.c
