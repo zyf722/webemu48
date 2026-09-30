@@ -40,6 +40,7 @@
  * Platform-specific implementations live outside the Emu48 core.
  */
 typedef struct AAsset AAsset;
+typedef struct AAssetManager AAssetManager;
 #define LOGD(...) do { fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
 #define LOGE(...) do { fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
 #ifndef PATH_MAX
