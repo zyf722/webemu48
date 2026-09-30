@@ -48,6 +48,8 @@ jobs:
           cp web/demo/bootstrap.js _site/
           cp web/demo/coi-serviceworker.js _site/
           cp app/src/main/assets/calculators/real39gp-lc.png _site/
+          cp app/src/main/assets/calculators/real39gs-lc.png _site/
+          cp app/src/main/assets/calculators/real40gs-lc.png _site/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
