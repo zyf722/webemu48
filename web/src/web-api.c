@@ -467,6 +467,77 @@ int webemu48_lcd_raw_max(void)
     return maximum;
 }
 
+static int webemu48_lcd_nonzero_stat(int selector)
+{
+    if (!hLcdDC || !hLcdDC->selectedBitmap ||
+        !hLcdDC->selectedBitmap->bitmapInfoHeader ||
+        !hLcdDC->selectedBitmap->bitmapBits)
+        return -1;
+
+    const BITMAPINFOHEADER *header = hLcdDC->selectedBitmap->bitmapInfoHeader;
+    const int width = header->biWidth;
+    const int height = abs(header->biHeight);
+    const int stride = 4 * ((width * header->biBitCount + 31) / 32);
+    const BYTE *bits = (const BYTE *) hLcdDC->selectedBitmap->bitmapBits;
+
+    int minX = width;
+    int maxX = -1;
+    int minY = height;
+    int maxY = -1;
+    int count = 0;
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            if (bits[y * stride + x] == 0)
+                continue;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            ++count;
+        }
+    }
+
+    switch (selector) {
+    case 0: return count;
+    case 1: return count ? minX : -1;
+    case 2: return maxX;
+    case 3: return count ? minY : -1;
+    case 4: return maxY;
+    default: return -1;
+    }
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_nonzero_count(void)
+{
+    return webemu48_lcd_nonzero_stat(0);
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_nonzero_min_x(void)
+{
+    return webemu48_lcd_nonzero_stat(1);
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_nonzero_max_x(void)
+{
+    return webemu48_lcd_nonzero_stat(2);
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_nonzero_min_y(void)
+{
+    return webemu48_lcd_nonzero_stat(3);
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_nonzero_max_y(void)
+{
+    return webemu48_lcd_nonzero_stat(4);
+}
+
 static int webemu48_visible_raw_extreme(BOOL wantMaximum)
 {
     if (!hLcdDC || !hLcdDC->selectedBitmap ||
