@@ -19,7 +19,9 @@
 #include <sys/mman.h>
 #include <pthread.h>
 #include <semaphore.h>
+#if defined(__ANDROID__)
 #include <android/bitmap.h>
+#endif
 #include <sys/socket.h>
 #include "core/resource.h"
 #include "win32-layer.h"
@@ -27,9 +29,11 @@
 #include "core/lodepng.h"
 
 
+#if defined(__ANDROID__)
 extern JavaVM *java_machine;
 extern jobject bitmapMainScreen;
 extern AndroidBitmapInfo androidBitmapInfo;
+#endif
 //extern RECT mainViewRectangleToUpdate;
 
 extern HANDLE hWnd;
