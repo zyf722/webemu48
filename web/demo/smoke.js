@@ -136,6 +136,13 @@ try {
       ir15x: moduleInstance._webemu48_ir15x(),
       rawMin: moduleInstance._webemu48_lcd_raw_min(),
       rawMax: moduleInstance._webemu48_lcd_raw_max(),
+      visibleRawMin: moduleInstance._webemu48_lcd_visible_raw_min(),
+      visibleRawMax: moduleInstance._webemu48_lcd_visible_raw_max(),
+      contrast: moduleInstance._webemu48_contrast(),
+      palette0: moduleInstance._webemu48_palette0_rgb(),
+      palette1: moduleInstance._webemu48_palette1_rgb(),
+      boffset: moduleInstance._webemu48_boffset(),
+      d0offset: moduleInstance._webemu48_d0offset(),
       width: moduleInstance._webemu48_lcd_width(),
       height: moduleInstance._webemu48_lcd_height()
     };
