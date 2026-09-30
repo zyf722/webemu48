@@ -20,14 +20,31 @@
 #include <wchar.h>
 #include <stdio.h>
 #include <string.h>
-#include <jni.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <limits.h>
+#include <time.h>
+
+#if defined(__ANDROID__)
+#include <jni.h>
 #include <android/bitmap.h>
 #include <android/asset_manager.h>
 #include <android/log.h>
 #define LOG_TAG "NDK_NativeEmuXX"
 #define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
 #define LOGE(...) ((void)__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
+#else
+/*
+ * Keep the Win32 compatibility header usable by non-Android ports.
+ * Platform-specific implementations live outside the Emu48 core.
+ */
+typedef struct AAsset AAsset;
+#define LOGD(...) do { fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
+#define LOGE(...) do { fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+#endif
 
 
 #if defined DEBUG_ANDROID_TIMER
@@ -911,8 +928,20 @@ typedef const WAVEFORMATEX FAR *LPCWAVEFORMATEX;
 #define CALLBACK_THREAD     (CALLBACK_TASK)/* thread ID replaces 16 bit task */
 
 
+#if defined(__ANDROID__)
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
+#else
+/*
+ * Opaque placeholders for Android OpenSL ES handles. The browser backend
+ * will use WebAudio instead and never dereference these values.
+ */
+typedef void *SLObjectItf;
+typedef void *SLEngineItf;
+typedef void *SLPlayItf;
+typedef void *SLAndroidSimpleBufferQueueItf;
+typedef void *SLVolumeItf;
+#endif
 
 struct _HWAVEOUT;
 typedef struct _HWAVEOUT * HWAVEOUT;
