@@ -6,7 +6,6 @@
  */
 
 #include "core/pch.h"
-#include "core/Emu48.h"
 #include "core/kml.h"
 #include "emu.h"
 #include "win32-layer.h"
