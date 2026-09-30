@@ -1284,12 +1284,20 @@ static VOID InitGlobal(KmlBlock* pBlock)
 			PrintfToLog(_T("Calculator Class : %u"), nCurrentClass);
 			break;
 		case TOK_ICON:
+#if defined(WEBEMU48_WEB_PORT)
+			/*
+			 * The browser provides its own calculator skin and has no native
+			 * window icon. Avoid embedding large .ico resources in webemu48.data.
+			 */
+			PrintfToLog(_T("Icon %s ignored by Web port."), (LPTSTR)pLine->nParam[0]);
+#else
 			if (!LoadIconFromFile((LPTSTR) pLine->nParam[0]))
 			{
 				PrintfToLog(_T("Cannot load Icon %s."), (LPTSTR)pLine->nParam[0]);
 				break;
 			}
 			PrintfToLog(_T("Icon %s loaded."), (LPTSTR)pLine->nParam[0]);
+#endif
 			break;
 		case TOK_DEBUG:
 			bDebug = (BOOL) pLine->nParam[0]&1;
@@ -1328,12 +1336,39 @@ static VOID InitGlobal(KmlBlock* pBlock)
 				AddToLog(_T("Please put only one Bitmap command in the Global block."));
 				break;
 			}
+#if defined(WEBEMU48_WEB_PORT)
+			/*
+			 * Native Emu48 uses the KML bitmap for the calculator body. The Web
+			 * UI renders that skin separately, but InitKML still expects hMainDC
+			 * to exist. A 1x1 placeholder preserves the native lifecycle without
+			 * embedding each full calculator PNG into the Wasm data package.
+			 */
+			hMainDC = CreateCompatibleDC(hWindowDC);
+			if (hMainDC == NULL)
+			{
+				PrintfToLog(_T("Cannot create Web placeholder Bitmap %s."), (LPTSTR)pLine->nParam[0]);
+				break;
+			}
+			{
+				HBITMAP hWebBitmap = CreateCompatibleBitmap(hWindowDC,1,1);
+				if (hWebBitmap == NULL)
+				{
+					DeleteDC(hMainDC);
+					hMainDC = NULL;
+					PrintfToLog(_T("Cannot create Web placeholder Bitmap %s."), (LPTSTR)pLine->nParam[0]);
+					break;
+				}
+				hMainBitmap = (HBITMAP) SelectObject(hMainDC,hWebBitmap);
+			}
+			PrintfToLog(_T("Bitmap %s represented by Web placeholder."), (LPTSTR)pLine->nParam[0]);
+#else
 			if (!CreateMainBitmap((LPTSTR)pLine->nParam[0]))
 			{
 				PrintfToLog(_T("Cannot load Bitmap %s."), (LPTSTR)pLine->nParam[0]);
 				break;
 			}
 			PrintfToLog(_T("Bitmap %s loaded."), (LPTSTR)pLine->nParam[0]);
+#endif
 			break;
 		case TOK_COLOR:
 			dwTColorTol = (DWORD) pLine->nParam[0];
