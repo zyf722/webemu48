@@ -19,6 +19,7 @@
 #include <semaphore.h>
 #include <wchar.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <sys/select.h>
 #include <sys/types.h>
