@@ -259,6 +259,21 @@ static BYTE webemu48_lcd_rgba_buffer[
 WEBEMU48_EXPORT
 int webemu48_lcd_refresh(void)
 {
+    /*
+     * Rebuild the logical LCD from the calculator's current display memory.
+     * The native port normally maintains hLcdDC incrementally through GDI
+     * write notifications. In a browser those notifications can miss the
+     * initial boot redraw, leaving the DIB stale even though the ROM has
+     * enabled the display. A full 64/80-line rebuild is cheap and makes the
+     * framebuffer snapshot authoritative.
+     */
+    if (Chipset.IORam[BITOFFSET] & DON) {
+        UpdateMainDisplay();
+        UpdateMenuDisplay();
+        if (Chipset.d0size)
+            RefreshDisp0();
+    }
+
     if (!hLcdDC || !hLcdDC->selectedBitmap)
         return FALSE;
 
