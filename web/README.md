@@ -1,31 +1,24 @@
-# Web port bootstrap
+# Web port
 
-This directory contains the browser/WebAssembly port of the Android Emu48 fork.
+The browser build is split into two layers:
 
-## Initial strategy
+- `web/CMakeLists.txt` + `web/src/`: Emscripten/pthread port of the Emu48 core.
+- `web/frontend/`: Vite + TypeScript user interface.
 
-The Android fork already keeps most of the original Emu48 sources under
-`app/src/main/cpp/core` and redirects Win32 headers through
-`app/src/main/cpp/win32-layer.h`. The Web port keeps that architecture:
+The production site never bundles calculator ROMs. ROMs are supplied by the
+user and written only to Emscripten's in-memory filesystem.
 
-- keep the Emu48 core unchanged where possible;
-- keep Android behavior behind `__ANDROID__`;
-- add Web-specific platform implementations instead of JNI calls;
-- first make the core compile as WebAssembly objects;
-- then add ROM/KML loading, execution, framebuffer export, input and persistence.
-
-## Portability probe
-
-The first target intentionally compiles a representative subset of the core
-without linking a complete emulator. This exposes accidental Android SDK
-dependencies while avoiding fake implementations merely to satisfy the linker.
-
-With Emscripten installed:
+## Frontend
 
 ```sh
-emcmake cmake -S web -B build/web -G Ninja
-cmake --build build/web
+cd web/frontend
+npm install
+npm run typecheck
+npm run dev
 ```
 
-A successful probe means the Saturn execution core can be compiled without
-including JNI, Android Bitmap or OpenSL ES headers.
+Vite emits COOP/COEP headers in dev/preview. GitHub Pages uses
+`coi-serviceworker.js` to provide the same cross-origin isolation.
+
+The production assembly places generated `webemu48.*` files under the built
+frontend's `runtime/` directory.
