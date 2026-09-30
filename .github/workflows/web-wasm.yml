@@ -96,7 +96,7 @@ jobs:
             echo "No Chromium/Chrome binary found on runner"
             exit 1
           fi
-          "$CHROME" \
+          timeout 30s "$CHROME" \
             --headless=new \
             --no-sandbox \
             --disable-gpu \
@@ -104,6 +104,6 @@ jobs:
             --virtual-time-budget=20000 \
             --dump-dom \
             http://127.0.0.1:8000/smoke.html \
-            > /tmp/webemu48-smoke-dom.html
+            > /tmp/webemu48-smoke-dom.html || true
           cat /tmp/webemu48-smoke-dom.html
           grep -q 'data-smoke="pass"' /tmp/webemu48-smoke-dom.html
