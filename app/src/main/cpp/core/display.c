@@ -4,7 +4,7 @@
  *   This file is part of Emu48
  *
  *   Copyright (C) 1995 Sebastien Carlier
- *   Copyright (C) 2002 Christoph Gieﬂelink
+ *   Copyright (C) 2002 Christoph Gie√üelink
  *
  */
 #include "pch.h"
@@ -214,6 +214,26 @@ BOOL CreateMainBitmap(LPCTSTR szFilename)
 	_ASSERT(hWindowDC != NULL);
 	VERIFY(hMainDC = CreateCompatibleDC(hWindowDC));
 	if (hMainDC == NULL) return FALSE;		// quit if failed
+
+#if defined(WEBEMU48_WEB_PORT)
+	/*
+	 * The browser renders the calculator body independently from the native
+	 * GDI surface. Keep a tiny placeholder bitmap so the existing KML lifecycle
+	 * and hMainDC validity checks remain unchanged without embedding each skin
+	 * image in the Wasm data package.
+	 */
+	{
+		HBITMAP hWebBitmap = CreateCompatibleBitmap(hWindowDC,1,1);
+		if (hWebBitmap == NULL)
+		{
+			DeleteDC(hMainDC);
+			hMainDC = NULL;
+			return FALSE;
+		}
+		hMainBitmap = (HBITMAP) SelectObject(hMainDC,hWebBitmap);
+	}
+	return TRUE;
+#else
 	hMainBitmap = LoadBitmapFile(szFilename,TRUE);
 	if (hMainBitmap == NULL)
 	{
@@ -226,6 +246,7 @@ BOOL CreateMainBitmap(LPCTSTR szFilename)
 	VERIFY(SelectPalette(hMainDC,hPalette,FALSE));
 	RealizePalette(hMainDC);
 	return TRUE;
+#endif
 }
 
 VOID DestroyMainBitmap(VOID)
