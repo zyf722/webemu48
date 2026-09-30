@@ -45,9 +45,9 @@ to use.
 - `web/CMakeLists.txt` — Emscripten build.
 - `web/src/` — browser platform/API glue.
 - `web/frontend/` — browser UI.
-- `app/src/main/cpp/core/` — inherited Emu48 core.
-- `app/src/main/cpp/win32*` — compatibility layer used by the port.
-- `app/src/main/assets/calculators/` — KML/patch resources used by the core and tests.
+- `native/core/` — inherited Emu48 core.
+- `native/win32*` — compatibility layer used by the port.
+- `assets/calculators/` — KML/patch resources used by the core and tests.
 
 The repository was derived from Emu48 for Android, which in turn ports the
 Windows Emu48/Emu48+ codebase. The Android application/UI build has been

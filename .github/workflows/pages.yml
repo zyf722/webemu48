@@ -6,8 +6,8 @@ on:
       - web-port
     paths:
       - "web/**"
-      - "app/src/main/cpp/**"
-      - "app/src/main/assets/calculators/**"
+      - "native/**"
+      - "assets/calculators/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

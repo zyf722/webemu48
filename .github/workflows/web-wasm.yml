@@ -6,14 +6,14 @@ on:
       - web-port
     paths:
       - "web/**"
-      - "app/src/main/cpp/**"
-      - "app/src/main/assets/calculators/**"
+      - "native/**"
+      - "assets/calculators/**"
       - ".github/workflows/web-wasm.yml"
   pull_request:
     paths:
       - "web/**"
-      - "app/src/main/cpp/**"
-      - "app/src/main/assets/calculators/**"
+      - "native/**"
+      - "assets/calculators/**"
       - ".github/workflows/web-wasm.yml"
 
 permissions:
@@ -86,7 +86,7 @@ jobs:
           path: dist
 
       - name: Prepare frontend E2E ROM
-        run: cp app/src/main/assets/calculators/rom.39g dist/rom.39g
+        run: cp assets/calculators/rom.39g dist/rom.39g
 
       - name: Start cross-origin-isolated server
         run: |
@@ -405,8 +405,8 @@ jobs:
         run: |
           cp web/demo/smoke.html dist/
           cp web/demo/smoke.js dist/
-          cp app/src/main/assets/calculators/rom.39g dist/rom.39g
-          cp app/src/main/assets/calculators/rom.49g dist/rom.49g
+          cp assets/calculators/rom.39g dist/rom.39g
+          cp assets/calculators/rom.49g dist/rom.49g
 
       - name: Start cross-origin-isolated server
         run: |

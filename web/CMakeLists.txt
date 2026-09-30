@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(webemu48_portability_probe LANGUAGES C)
 
-set(EMU48_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/../app/src/main/cpp")
-set(EMU48_CORE_DIR "${EMU48_CPP_DIR}/core")
+set(EMU48_NATIVE_DIR "${CMAKE_CURRENT_LIST_DIR}/../native")
+set(EMU48_CORE_DIR "${EMU48_NATIVE_DIR}/core")
+set(CALCULATOR_ASSET_DIR "${CMAKE_CURRENT_LIST_DIR}/../assets/calculators")
 
 # Compile the inherited Emu48 core plus the browser-specific host/platform
 # shims. The original Android application shell is not part of this branch.
@@ -12,7 +13,7 @@ add_library(webemu48_core_probe OBJECT
     "${EMU48_CORE_DIR}/ddeserv.c"
     "${EMU48_CORE_DIR}/disasm.c"
     "${EMU48_CORE_DIR}/dismem.c"
-    "${EMU48_CPP_DIR}/patch/display_ex.c"
+    "${EMU48_NATIVE_DIR}/patch/display_ex.c"
     "${EMU48_CORE_DIR}/disrpl.c"
     "${EMU48_CORE_DIR}/engine.c"
     "${EMU48_CORE_DIR}/fetch.c"
@@ -36,7 +37,7 @@ add_library(webemu48_core_probe OBJECT
     "${EMU48_CORE_DIR}/stack.c"
     "${EMU48_CORE_DIR}/symbfile.c"
     "${EMU48_CORE_DIR}/timer.c"
-    "${EMU48_CPP_DIR}/win32-layer.c"
+    "${EMU48_NATIVE_DIR}/win32-layer.c"
     src/emu-host.c
     src/core-stubs.c
     src/web-platform.c
@@ -45,8 +46,8 @@ add_library(webemu48_core_probe OBJECT
 )
 
 target_include_directories(webemu48_core_probe PRIVATE
-    "${EMU48_CPP_DIR}"
-    "${EMU48_CPP_DIR}/win32"
+    "${EMU48_NATIVE_DIR}"
+    "${EMU48_NATIVE_DIR}/win32"
 )
 
 target_compile_definitions(webemu48_core_probe PRIVATE
@@ -110,15 +111,15 @@ if(EMSCRIPTEN)
         "-sEXIT_RUNTIME=0"
         "-sFORCE_FILESYSTEM=1"
         "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','HEAPU8']"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real39gp-lc.kml@/calculators/real39gp-lc.kml"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real39gs-lc.kml@/calculators/real39gs-lc.kml"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real40gs-lc.kml@/calculators/real40gs-lc.kml"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real48gii-lc.kml@/calculators/real48gii-lc.kml"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real49gp-lc.kml@/calculators/real49gp-lc.kml"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real50g-lc.kml@/calculators/real50g-lc.kml"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/keyb3940.kmi@/calculators/keyb3940.kmi"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/keyb4950.kmi@/calculators/keyb4950.kmi"
-        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/patch.39g@/calculators/patch.39g"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/real39gp-lc.kml@/calculators/real39gp-lc.kml"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/real39gs-lc.kml@/calculators/real39gs-lc.kml"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/real40gs-lc.kml@/calculators/real40gs-lc.kml"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/real48gii-lc.kml@/calculators/real48gii-lc.kml"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/real49gp-lc.kml@/calculators/real49gp-lc.kml"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/real50g-lc.kml@/calculators/real50g-lc.kml"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/keyb3940.kmi@/calculators/keyb3940.kmi"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/keyb4950.kmi@/calculators/keyb4950.kmi"
+        "SHELL:--preload-file ${CALCULATOR_ASSET_DIR}/patch.39g@/calculators/patch.39g"
     )
 
     set_target_properties(webemu48 PROPERTIES
