@@ -12,6 +12,22 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function waitForState(moduleInstance, expectedState, timeoutMs = 5000) {
+  const deadline = performance.now() + timeoutMs;
+
+  while (performance.now() < deadline) {
+    const state = moduleInstance._webemu48_state();
+    if (state === expectedState) return state;
+    await sleep(10);
+  }
+
+  const state = moduleInstance._webemu48_state();
+  const nextState = moduleInstance._webemu48_next_state();
+  throw new Error(
+    `Timed out waiting for state ${expectedState}; state=${state}, next=${nextState}`
+  );
+}
+
 function hasPixelVariation(heap, pointer, width, height) {
   const length = width * height * 4;
   if (!pointer || length <= 4) return false;
@@ -63,6 +79,8 @@ try {
   );
   if (!initialized) throw new Error("webemu48_init() returned false");
 
+  await waitForState(moduleInstance, 1);
+
   const opened = moduleInstance.ccall(
     "webemu48_new_document",
     "number",
@@ -70,6 +88,8 @@ try {
     ["real39gp-lc.kml", "/calculators/"]
   );
   if (!opened) throw new Error("webemu48_new_document() returned false");
+
+  await waitForState(moduleInstance, 0);
 
   const deadline = performance.now() + 12000;
   let lastState = moduleInstance._webemu48_state();

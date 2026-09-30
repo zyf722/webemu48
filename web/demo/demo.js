@@ -25,6 +25,22 @@ function ensureDirectory(FS, path) {
   }
 }
 
+async function waitForState(expectedState, timeoutMs = 5000) {
+  const deadline = performance.now() + timeoutMs;
+
+  while (performance.now() < deadline) {
+    const state = moduleInstance._webemu48_state();
+    if (state === expectedState) return state;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+
+  const state = moduleInstance._webemu48_state();
+  const nextState = moduleInstance._webemu48_next_state();
+  throw new Error(
+    `Timed out waiting for emulator state ${expectedState}; state=${state}, next=${nextState}`
+  );
+}
+
 function toKmlCoordinates(event) {
   const rect = calculator.getBoundingClientRect();
   return {
@@ -107,6 +123,9 @@ async function startCalculator() {
     return;
   }
 
+  writeLog("Waiting for emulator worker…");
+  await waitForState(1);
+
   const opened = moduleInstance.ccall(
     "webemu48_new_document",
     "number",
@@ -118,6 +137,9 @@ async function startCalculator() {
     startButton.disabled = false;
     return;
   }
+
+  writeLog("Waiting for calculator CPU…");
+  await waitForState(0);
 
   writeLog("Emulator started. The calculator image is now clickable.");
   running = true;

@@ -117,11 +117,34 @@ int webemu48_init(const char *baseDirectory)
     soundAvailable = FALSE;
     soundEnabled = FALSE;
 
+    /*
+     * The Android/Win32 startup waits synchronously for WorkerThread to enter
+     * SM_INVALID. That blocks the browser UI thread under Emscripten pthreads.
+     * Start the worker and let JavaScript poll webemu48_state() instead.
+     */
     ResumeThread(hThread);
-    while (nState != nNextState)
-        Sleep(0);
 
     webemu48_initialized = TRUE;
+    return TRUE;
+}
+
+static BOOL webemu48_request_run(void)
+{
+    if (nState == SM_RUN)
+        return TRUE;
+
+    if (nState != SM_INVALID)
+        return FALSE;
+
+    /*
+     * Non-blocking form of SwitchToState(SM_RUN) for the browser UI thread.
+     * WorkerThread observes nNextState after hEventShutdn is signalled and
+     * updates nState to SM_RUN itself.
+     */
+    nNextState = SM_RUN;
+    bInterrupt = Chipset.Shutdn || Chipset.SoftInt;
+    ResumeDebugger();
+    SetEvent(hEventShutdn);
     return TRUE;
 }
 
@@ -131,11 +154,12 @@ int webemu48_new_document(const char *kmlFilename, const char *baseDirectory)
     if (!webemu48_initialized || !kmlFilename || !kmlFilename[0])
         return FALSE;
 
-    if (bDocumentAvail) {
-        SwitchToState(SM_INVALID);
-        if (bAutoSave)
-            SaveDocument();
-    }
+    /*
+     * The first Web preview supports one active document per module instance.
+     * Avoid the core's synchronous RUN -> INVALID transition on the UI thread.
+     */
+    if (bDocumentAvail || nState != SM_INVALID)
+        return FALSE;
 
     chooseCurrentKmlMode = ChooseKmlMode_FILE_NEW;
     _tcsncpy(szChosenCurrentKml, kmlFilename, MAX_PATH - 1);
@@ -149,8 +173,8 @@ int webemu48_new_document(const char *kmlFilename, const char *baseDirectory)
 
     if (result) {
         mainViewResizeCallback(nBackgroundW, nBackgroundH);
-        if (pbyRom)
-            SwitchToState(SM_RUN);
+        if (pbyRom && !webemu48_request_run())
+            return FALSE;
     }
 
     return result;
@@ -184,6 +208,12 @@ WEBEMU48_EXPORT
 int webemu48_state(void)
 {
     return (int) nState;
+}
+
+WEBEMU48_EXPORT
+int webemu48_next_state(void)
+{
+    return (int) nNextState;
 }
 
 WEBEMU48_EXPORT
