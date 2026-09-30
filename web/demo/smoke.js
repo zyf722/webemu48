@@ -127,7 +127,19 @@ try {
   }
 
   if (root.dataset.smoke !== "pass") {
-    throw new Error(`LCD never became non-uniform; state=${lastState}`);
+    const diagnostics = {
+      state: lastState,
+      nextState: moduleInstance._webemu48_next_state(),
+      displayOn: moduleInstance._webemu48_display_on(),
+      shutdn: moduleInstance._webemu48_cpu_shutdn(),
+      pc: moduleInstance._webemu48_pc(),
+      ir15x: moduleInstance._webemu48_ir15x(),
+      rawMin: moduleInstance._webemu48_lcd_raw_min(),
+      rawMax: moduleInstance._webemu48_lcd_raw_max(),
+      width: moduleInstance._webemu48_lcd_width(),
+      height: moduleInstance._webemu48_lcd_height()
+    };
+    throw new Error("LCD never became non-uniform; " + JSON.stringify(diagnostics));
   }
 } catch (error) {
   console.error(error);
