@@ -30,6 +30,16 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v6
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install frontend dependencies
+        run: npm install --prefix web/frontend --no-audit --no-fund
+
+      - name: Typecheck and build frontend
+        run: npm run build --prefix web/frontend
+
       - name: Build WebAssembly
         run: |
           docker run --rm \
@@ -41,18 +51,14 @@ jobs:
 
       - name: Assemble Pages site
         run: |
-          mkdir -p _site
-          cp build/pages/webemu48.* _site/
-          cp web/demo/index.html _site/
-          cp web/demo/demo.js _site/
-          cp web/demo/bootstrap.js _site/
-          cp web/demo/coi-serviceworker.js _site/
-          cp app/src/main/assets/calculators/real39gp-lc.png _site/
-          cp app/src/main/assets/calculators/real39gs-lc.png _site/
-          cp app/src/main/assets/calculators/real40gs-lc.png _site/
-          cp app/src/main/assets/calculators/real48gii-lc.png _site/
-          cp app/src/main/assets/calculators/real49gp-lc.png _site/
-          cp app/src/main/assets/calculators/real50g-lc.png _site/
+          rm -rf _site
+          cp -R web/frontend/dist _site
+          mkdir -p _site/runtime
+          cp build/pages/webemu48.* _site/runtime/
+          test -f _site/index.html
+          test -f _site/runtime/webemu48.js
+          test -f _site/skins/hp39gplus.svg
+          test -f _site/skins/hp50g.svg
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5

@@ -24,62 +24,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  portability-probe:
+  build:
     runs-on: ubuntu-latest
-    container:
-      image: emscripten/emsdk:latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check browser JavaScript syntax
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install frontend dependencies
+        run: npm install --prefix web/frontend --no-audit --no-fund
+
+      - name: Typecheck and build frontend
+        run: npm run build --prefix web/frontend
+
+      - name: Build WebAssembly
         run: |
-          for script in web/demo/*.js; do
-            node --check "$script"
-          done
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            emscripten/emsdk:latest \
+            sh -lc 'emcmake cmake -S web -B build/web && cmake --build build/web --parallel 2 --verbose'
+          sudo chown -R "$(id -u):$(id -g)" build/web
 
-      - name: Show Emscripten version
-        run: emcc --version
-
-      - name: Configure compile-only probe
-        run: emcmake cmake -S web -B build/web
-
-      - name: Build compile-only probe
-        run: cmake --build build/web --parallel 2 --verbose
-
-      - name: Assemble browser demo
+      - name: Assemble browser site
         run: |
-          mkdir -p dist
-          cp build/web/webemu48.* dist/
-          test -f dist/webemu48.js
-          test -f dist/webemu48.wasm
-          test -f dist/webemu48.data
-          cp web/demo/index.html dist/
-          cp web/demo/demo.js dist/
-          cp web/demo/bootstrap.js dist/
-          cp web/demo/coi-serviceworker.js dist/
+          rm -rf dist
+          cp -R web/frontend/dist dist
+          mkdir -p dist/runtime
+          cp build/web/webemu48.* dist/runtime/
           cp web/demo/serve.py dist/
-          cp app/src/main/assets/calculators/real39gp-lc.png dist/
-          cp app/src/main/assets/calculators/real39gs-lc.png dist/
-          cp app/src/main/assets/calculators/real40gs-lc.png dist/
-          cp app/src/main/assets/calculators/real48gii-lc.png dist/
-          cp app/src/main/assets/calculators/real49gp-lc.png dist/
-          cp app/src/main/assets/calculators/real50g-lc.png dist/
+          test -f dist/index.html
+          test -f dist/runtime/webemu48.js
+          test -f dist/runtime/webemu48.wasm
+          test -f dist/runtime/webemu48.data
+          test -f dist/skins/hp39gplus.svg
+          test -f dist/skins/hp50g.svg
 
-      - name: Upload browser demo
+      - name: Upload browser site
         uses: actions/upload-artifact@v4
         with:
-          name: webemu48-browser-demo
+          name: webemu48-browser-site
           path: dist/
           if-no-files-found: error
 
   browser-demo-ui:
-    needs: portability-probe
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download browser demo
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download browser site
         uses: actions/download-artifact@v4
         with:
-          name: webemu48-browser-demo
+          name: webemu48-browser-site
           path: dist
 
       - name: Start cross-origin-isolated server
@@ -129,9 +130,7 @@ jobs:
             "http://127.0.0.1:9222/json/new?" + encodeURIComponent(targetUrl),
             { method: "PUT" }
           );
-          if (!targetResponse.ok) {
-            throw new Error("Could not create Chromium target: " + targetResponse.status);
-          }
+          if (!targetResponse.ok) throw new Error("Could not create Chromium target: " + targetResponse.status);
 
           const target = await targetResponse.json();
           const socket = new WebSocket(target.webSocketDebuggerUrl);
@@ -161,13 +160,8 @@ jobs:
           }
 
           async function evaluate(expression) {
-            const result = await cdp("Runtime.evaluate", {
-              expression,
-              returnByValue: true
-            });
-            if (result?.exceptionDetails) {
-              throw new Error(JSON.stringify(result.exceptionDetails));
-            }
+            const result = await cdp("Runtime.evaluate", { expression, returnByValue: true });
+            if (result?.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
             return result?.result?.value;
           }
 
@@ -176,18 +170,12 @@ jobs:
           const deadline = Date.now() + 30000;
           let status = "";
           while (Date.now() < deadline) {
-            status = await evaluate(
-              'document.querySelector("#bootstrap-status")?.textContent || ""'
-            );
+            status = await evaluate('document.querySelector("#bootstrap-status")?.textContent || ""');
             if (status === "Runtime ready.") break;
-            if (status.includes("failed")) {
-              throw new Error("Demo bootstrap failed: " + status);
-            }
+            if (status.includes("failed")) throw new Error("Frontend bootstrap failed: " + status);
             await new Promise(resolve => setTimeout(resolve, 250));
           }
-          if (status !== "Runtime ready.") {
-            throw new Error("Timed out waiting for demo runtime: " + status);
-          }
+          if (status !== "Runtime ready.") throw new Error("Timed out waiting for frontend runtime: " + status);
 
           await evaluate(`(() => {
             const select = document.querySelector("#model");
@@ -196,63 +184,60 @@ jobs:
             return true;
           })()`);
 
+          for (let i = 0; i < 20; i++) {
+            const loaded = await evaluate(
+              'document.querySelector("#skin")?.complete && document.querySelector("#skin")?.naturalWidth > 0'
+            );
+            if (loaded) break;
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
           const snapshot = JSON.parse(await evaluate(`JSON.stringify({
             isolated: crossOriginIsolated,
             status: document.querySelector("#bootstrap-status")?.textContent || "",
             models: Array.from(document.querySelectorAll("#model option")).map(option => option.value),
             startDisabled: document.querySelector("#start")?.disabled,
             startText: document.querySelector("#start")?.textContent || "",
-            skin: document.querySelector("#skin")?.getAttribute("src") || "",
+            skin: document.querySelector("#skin")?.src || "",
+            skinWidth: document.querySelector("#skin")?.naturalWidth || 0,
+            skinHeight: document.querySelector("#skin")?.naturalHeight || 0,
             aspectRatio: document.querySelector("#calculator")?.style.aspectRatio || "",
             tabIndex: document.querySelector("#calculator")?.tabIndex
           })`));
 
           const expectedModels = ["39gp", "39gs", "40gs", "48gii", "49gp", "50g"];
-          if (!snapshot.isolated) throw new Error("Demo is not cross-origin isolated");
-          if (snapshot.status !== "Runtime ready.") {
-            throw new Error("Unexpected bootstrap status: " + snapshot.status);
-          }
-          if (snapshot.models.join(",") !== expectedModels.join(",")) {
-            throw new Error("Unexpected model list: " + snapshot.models.join(","));
-          }
+          if (!snapshot.isolated) throw new Error("Frontend is not cross-origin isolated");
+          if (snapshot.status !== "Runtime ready.") throw new Error("Unexpected runtime status: " + snapshot.status);
+          if (snapshot.models.join(",") !== expectedModels.join(",")) throw new Error("Unexpected model list: " + snapshot.models.join(","));
           if (snapshot.startDisabled) throw new Error("Start button stayed disabled");
-          if (snapshot.startText !== "Start 50g") {
-            throw new Error("50g model switch did not update Start button: " + snapshot.startText);
-          }
-          if (!snapshot.skin.endsWith("real50g-lc.png")) {
-            throw new Error("50g model switch did not update skin: " + snapshot.skin);
-          }
-          if (snapshot.aspectRatio !== "437 / 940") {
-            throw new Error("50g model switch did not update aspect ratio: " + snapshot.aspectRatio);
-          }
-          if (snapshot.tabIndex !== 0) {
-            throw new Error("Calculator surface is not keyboard-focusable");
-          }
+          if (snapshot.startText !== "Start HP 50g") throw new Error("Model switch did not update Start button: " + snapshot.startText);
+          if (!snapshot.skin.endsWith("/skins/hp50g.svg")) throw new Error("Model switch did not update SVG skin: " + snapshot.skin);
+          if (snapshot.skinWidth !== 665 || snapshot.skinHeight !== 1340) throw new Error("Unexpected SVG dimensions: " + snapshot.skinWidth + "x" + snapshot.skinHeight);
+          if (snapshot.aspectRatio !== "665 / 1340") throw new Error("Unexpected calculator aspect ratio: " + snapshot.aspectRatio);
+          if (snapshot.tabIndex !== 0) throw new Error("Calculator surface is not keyboard-focusable");
 
-          console.log("PASS demo UI", snapshot);
+          console.log("PASS frontend UI", snapshot);
           socket.close();
           NODE
 
   browser-runtime-smoke:
-    needs: portability-probe
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        model:
-          - 39gp
-          - 39gs
-          - 40gs
-          - 48gii
-          - 49gp
-          - 50g
+        model: [39gp, 39gs, 40gs, 48gii, 49gp, 50g]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download browser demo
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download browser site
         uses: actions/download-artifact@v4
         with:
-          name: webemu48-browser-demo
+          name: webemu48-browser-site
           path: dist
 
       - name: Prepare runtime smoke
@@ -266,7 +251,6 @@ jobs:
         run: |
           cd dist
           nohup python3 serve.py > /tmp/webemu48-server.log 2>&1 &
-          echo $! > /tmp/webemu48-server.pid
           for i in {1..40}; do
             if curl -fsS http://127.0.0.1:8000/smoke.html >/dev/null; then
               exit 0
@@ -308,15 +292,12 @@ jobs:
 
           node <<'NODE'
           const model = process.env.SMOKE_MODEL || "39gp";
-          const targetUrl =
-            "http://127.0.0.1:8000/smoke.html?model=" + encodeURIComponent(model);
+          const targetUrl = "http://127.0.0.1:8000/smoke.html?model=" + encodeURIComponent(model);
           const targetResponse = await fetch(
             "http://127.0.0.1:9222/json/new?" + encodeURIComponent(targetUrl),
             { method: "PUT" }
           );
-          if (!targetResponse.ok) {
-            throw new Error("Could not create Chromium target: " + targetResponse.status);
-          }
+          if (!targetResponse.ok) throw new Error("Could not create Chromium target: " + targetResponse.status);
 
           const target = await targetResponse.json();
           const socket = new WebSocket(target.webSocketDebuggerUrl);
@@ -367,13 +348,11 @@ jobs:
               socket.close();
               process.exit(0);
             }
-
             if (last.state === "fail") {
               console.error(last.text);
               socket.close();
               process.exit(1);
             }
-
             await new Promise(resolve => setTimeout(resolve, 250));
           }
 

@@ -1,4 +1,4 @@
-import createWebEmu48 from "./webemu48.js";
+import createWebEmu48 from "./runtime/webemu48.js";
 
 const root = document.documentElement;
 const status = document.querySelector("#status");
@@ -123,7 +123,7 @@ try {
 
   const moduleInstance = await createWebEmu48({
     locateFile(path) {
-      return new URL(path, import.meta.url).href;
+      return new URL(`./runtime/${path}`, import.meta.url).href;
     },
     print() {},
     printErr(text) {

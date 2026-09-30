@@ -8,3 +8,5 @@
 .externalNativeBuild
 /app/.cxx
 /app/release
+web/frontend/node_modules/
+web/frontend/dist/
