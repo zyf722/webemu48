@@ -126,6 +126,8 @@ VOID KeyboardEvent(BOOL bPress, UINT out, UINT in)
 	}
 	AdjKeySpeed();							// adjust key repeat speed
 	ScanKeyboard(FALSE,FALSE);				// update Chipset.in register by 1ms keyboard poll
+#if !defined(WEBEMU48_WEB_PORT)
 	Sleep(dwKeyMinDelay);					// hold key state for a definite time
+#endif
 	return;
 }
