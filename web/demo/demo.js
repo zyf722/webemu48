@@ -14,6 +14,7 @@ const MODELS = {
   "39gp": {
     label: "HP 39g+",
     rom: "rom.39g",
+    romSize: 1048576,
     kml: "real39gp-lc.kml",
     skin: "real39gp-lc.png",
     width: 444,
@@ -24,6 +25,7 @@ const MODELS = {
   "39gs": {
     label: "HP 39gs",
     rom: "rom.39g",
+    romSize: 1048576,
     kml: "real39gs-lc.kml",
     skin: "real39gs-lc.png",
     width: 444,
@@ -34,6 +36,7 @@ const MODELS = {
   "40gs": {
     label: "HP 40gs",
     rom: "rom.39g",
+    romSize: 1048576,
     kml: "real40gs-lc.kml",
     skin: "real40gs-lc.png",
     width: 444,
@@ -44,6 +47,7 @@ const MODELS = {
   "48gii": {
     label: "HP 48gII",
     rom: "rom.49g",
+    romSize: 2097152,
     kml: "real48gii-lc.kml",
     skin: "real48gii-lc.png",
     width: 444,
@@ -54,6 +58,7 @@ const MODELS = {
   "49gp": {
     label: "HP 49g+",
     rom: "rom.49g",
+    romSize: 2097152,
     kml: "real49gp-lc.kml",
     skin: "real49gp-lc.png",
     width: 443,
@@ -64,6 +69,7 @@ const MODELS = {
   "50g": {
     label: "HP 50g",
     rom: "rom.49g",
+    romSize: 2097152,
     kml: "real50g-lc.kml",
     skin: "real50g-lc.png",
     width: 437,
@@ -76,10 +82,20 @@ const MODELS = {
 let moduleInstance = null;
 let running = false;
 let activePointerId = null;
-let lastPointer = { x: 0, y: 0 };
+let activePressPoint = null;
 
 function selectedModel() {
   return MODELS[modelSelect.value] || MODELS["39gp"];
+}
+
+function setControlsEnabled(enabled) {
+  startButton.disabled = !enabled;
+  modelSelect.disabled = !enabled;
+  romInput.disabled = !enabled;
+}
+
+function formatMiB(bytes) {
+  return `${(bytes / 1048576).toFixed(bytes % 1048576 === 0 ? 0 : 2)} MiB`;
 }
 
 function applyModelVisual() {
@@ -176,24 +192,22 @@ function pointerDown(event) {
   if (!running || activePointerId !== null) return;
 
   const point = toKmlCoordinates(event);
-  activePointerId = event.pointerId;
-  lastPointer = point;
-  calculator.setPointerCapture?.(event.pointerId);
-  moduleInstance._webemu48_button_down(point.x, point.y);
-  event.preventDefault();
-}
+  if (!moduleInstance._webemu48_button_down(point.x, point.y)) return;
 
-function pointerMove(event) {
-  if (event.pointerId !== activePointerId) return;
-  lastPointer = toKmlCoordinates(event);
+  activePointerId = event.pointerId;
+  activePressPoint = point;
+  calculator.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
 }
 
 function pointerUp(event) {
   if (!running || event.pointerId !== activePointerId) return;
 
-  const point = toKmlCoordinates(event);
-  moduleInstance._webemu48_button_up(point.x, point.y);
+  if (activePressPoint) {
+    moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
+  }
   activePointerId = null;
+  activePressPoint = null;
   event.preventDefault();
 }
 
@@ -212,10 +226,12 @@ async function bootModule() {
 
   bootstrapStatus.textContent = "Runtime ready.";
   log.textContent = "WebAssembly module loaded. Select a ROM image.";
-  startButton.disabled = false;
+  setControlsEnabled(true);
 }
 
 async function startCalculator() {
+  if (running) return;
+
   const model = selectedModel();
   const file = romInput.files?.[0];
   if (!file) {
@@ -223,64 +239,81 @@ async function startCalculator() {
     return;
   }
 
-  startButton.disabled = true;
-  modelSelect.disabled = true;
-  romInput.disabled = true;
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  ensureDirectory(moduleInstance.FS, "/calculators");
+  setControlsEnabled(false);
+  let documentOpened = false;
 
-  const romPath = `/calculators/${model.rom}`;
   try {
-    moduleInstance.FS.unlink(romPath);
-  } catch (_) {
+    if (file.size !== model.romSize) {
+      writeLog(
+        `Warning: ${model.label} normally uses a raw ${formatMiB(model.romSize)} ` +
+        `${model.rom} image, but the selected file is ${formatMiB(file.size)}. ` +
+        "Attempting to start it anyway."
+      );
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    ensureDirectory(moduleInstance.FS, "/calculators");
+
+    const romPath = `/calculators/${model.rom}`;
+    try {
+      moduleInstance.FS.unlink(romPath);
+    } catch (_) {
+    }
+    moduleInstance.FS.writeFile(romPath, bytes);
+
+    writeLog(
+      `ROM loaded as ${model.rom}: ${bytes.byteLength} bytes for ${model.label}`
+    );
+
+    const initialized = moduleInstance.ccall(
+      "webemu48_init",
+      "number",
+      ["string"],
+      ["/calculators/"]
+    );
+    if (!initialized) throw new Error("webemu48_init() failed.");
+
+    writeLog("Waiting for emulator worker…");
+    await waitForState(1);
+
+    const opened = moduleInstance.ccall(
+      "webemu48_new_document",
+      "number",
+      ["string", "string"],
+      [model.kml, "/calculators/"]
+    );
+    if (!opened) {
+      throw new Error(
+        `NewDocument() failed for ${model.label}. Check that the selected ROM matches the model family.`
+      );
+    }
+    documentOpened = true;
+
+    writeLog("Waiting for calculator CPU…");
+    await waitForState(0);
+    await waitForShutdown();
+
+    writeLog(`Powering on ${model.label}…`);
+    await pressPowerOn(model);
+
+    running = true;
+    bootstrapStatus.textContent = `${model.label} running.`;
+    writeLog(`${model.label} started. The calculator image is now clickable.`);
+    requestAnimationFrame(renderLoop);
+  } catch (error) {
+    console.error(error);
+    writeLog("Start failed: " + (error?.message || error));
+
+    if (documentOpened) {
+      bootstrapStatus.textContent = "Calculator start failed after document creation.";
+      writeLog(
+        "This browser module already owns an active calculator document. Reload the page before retrying."
+      );
+    } else {
+      bootstrapStatus.textContent = "Start failed. You can choose another model or ROM and retry.";
+      setControlsEnabled(true);
+    }
   }
-  moduleInstance.FS.writeFile(romPath, bytes);
-
-  writeLog(
-    `ROM loaded as ${model.rom}: ${bytes.byteLength} bytes for ${model.label}`
-  );
-
-  const initialized = moduleInstance.ccall(
-    "webemu48_init",
-    "number",
-    ["string"],
-    ["/calculators/"]
-  );
-  if (!initialized) {
-    writeLog("webemu48_init() failed.");
-    startButton.disabled = false;
-    modelSelect.disabled = false;
-    romInput.disabled = false;
-    return;
-  }
-
-  writeLog("Waiting for emulator worker…");
-  await waitForState(1);
-
-  const opened = moduleInstance.ccall(
-    "webemu48_new_document",
-    "number",
-    ["string", "string"],
-    [model.kml, "/calculators/"]
-  );
-  if (!opened) {
-    writeLog(`NewDocument() failed for ${model.label}. Check the selected ROM.`);
-    startButton.disabled = false;
-    modelSelect.disabled = false;
-    romInput.disabled = false;
-    return;
-  }
-
-  writeLog("Waiting for calculator CPU…");
-  await waitForState(0);
-  await waitForShutdown();
-
-  writeLog(`Powering on ${model.label}…`);
-  await pressPowerOn(model);
-
-  writeLog(`${model.label} started. The calculator image is now clickable.`);
-  running = true;
-  requestAnimationFrame(renderLoop);
 }
 
 function renderLoop() {
@@ -311,13 +344,15 @@ function renderLoop() {
 }
 
 calculator.addEventListener("pointerdown", pointerDown);
-calculator.addEventListener("pointermove", pointerMove);
 calculator.addEventListener("pointerup", pointerUp);
 calculator.addEventListener("pointercancel", pointerUp);
 calculator.addEventListener("lostpointercapture", event => {
   if (event.pointerId === activePointerId && running) {
-    moduleInstance._webemu48_button_up(lastPointer.x, lastPointer.y);
+    if (activePressPoint) {
+      moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
+    }
     activePointerId = null;
+    activePressPoint = null;
   }
 });
 
