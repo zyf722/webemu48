@@ -2123,6 +2123,7 @@ BOOL PatBlt(HDC hdcDest, int x, int y, int w, int h, DWORD rop) {
 		int destinationHeight = 0;
 		float destinationStride = 0;
 
+#if defined(__ANDROID__)
 		JNIEnv *jniEnv = NULL;
 
 		if (hdcDest->hdcCompatible == NULL) {
@@ -2156,6 +2157,11 @@ BOOL PatBlt(HDC hdcDest, int x, int y, int w, int h, DWORD rop) {
 				LOGD("AndroidBitmap_lockPixels() failed ! error=%d", ret);
 				return FALSE;
 			}
+#else
+		if (hdcDest->hdcCompatible == NULL) {
+			/* Browser main-window output is supplied by the Web framebuffer backend. */
+			return FALSE;
+#endif
 		} else {
 			hBitmapDestination = hdcDest->selectedBitmap;
 			pixelsDestination = (void *) hBitmapDestination->bitmapBits;
@@ -2219,8 +2225,10 @@ BOOL PatBlt(HDC hdcDest, int x, int y, int w, int h, DWORD rop) {
 			}
 		}
 
+#if defined(__ANDROID__)
 		if (jniEnv)
 			AndroidBitmap_unlockPixels(jniEnv, bitmapMainScreen);
+#endif
 	}
 	return 0;
 }
@@ -2275,6 +2283,7 @@ StretchBlt(HDC hdcDest, int xDest, int yDest, int wDest, int hDest, HDC hdcSrc, 
 				4 * ((sourceWidth * hBitmapSource->bitmapInfoHeader->biBitCount + 31) / 32);
 		int destinationStride = 0;
 
+#if defined(__ANDROID__)
 		JNIEnv *jniEnv = NULL;
 		jint ret;
 
@@ -2310,6 +2319,11 @@ StretchBlt(HDC hdcDest, int xDest, int yDest, int wDest, int hDest, HDC hdcSrc, 
 				LOGD("AndroidBitmap_lockPixels() failed ! error=%d", ret);
 				return FALSE;
 			}
+#else
+		if (hdcDest->hdcCompatible == NULL) {
+			/* Browser main-window output is supplied by the Web framebuffer backend. */
+			return FALSE;
+#endif
 		} else {
 			hBitmapDestination = hdcDest->selectedBitmap;
 			pixelsDestination = (void *) hBitmapDestination->bitmapBits;
@@ -2356,11 +2370,13 @@ StretchBlt(HDC hdcDest, int xDest, int yDest, int wDest, int hDest, HDC hdcSrc, 
 		                   rop, sourceTopDown, destinationTopDown, palPalEntry, brushColor,
 		                   backgroundColor);
 
+#if defined(__ANDROID__)
 		if (jniEnv && hdcDest->hdcCompatible == NULL &&
 		    (ret = AndroidBitmap_unlockPixels(jniEnv, bitmapMainScreen)) < 0) {
 			LOGD("AndroidBitmap_unlockPixels() failed ! error=%d", ret);
 			return FALSE;
 		}
+#endif
 
 		return TRUE;
 	}
