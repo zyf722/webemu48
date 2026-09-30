@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 #include <pthread.h>
 #include <semaphore.h>
 #if defined(__ANDROID__)
@@ -204,6 +205,7 @@ HANDLE CreateFile(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
 		}
 	}
 
+#if defined(__ANDROID__)
 	if (!forceNormalFile
 	    && (szCurrentAssetDirectory || _tcsncmp(lpFileName, assetsPrefix, assetsPrefixLength) == 0)
 	    && !foundDocumentScheme
@@ -228,7 +230,9 @@ HANDLE CreateFile(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
 			handle->fileAsset = asset;
 			return handle;
 		}
-	} else {
+	} else
+#endif
+	{
 		// Loading a "normal" file
 		// * either a file with the scheme "content://"
 		// * or a file with a simple name but within the current folder (szCurrentContentDirectory)
@@ -325,8 +329,10 @@ ReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNu
 	DWORD readByteCount = 0;
 	if (hFile->handleType == HANDLE_TYPE_FILE) {
 		readByteCount = (DWORD) read(hFile->fileDescriptor, lpBuffer, nNumberOfBytesToRead);
+#if defined(__ANDROID__)
 	} else if (hFile->handleType == HANDLE_TYPE_FILE_ASSET) {
 		readByteCount = (DWORD) AAsset_read(hFile->fileAsset, lpBuffer, nNumberOfBytesToRead);
+#endif
 	} else if (hFile->handleType == HANDLE_TYPE_COM) {
 		readByteCount = (DWORD) readSerialPort(hFile->commId, lpBuffer, nNumberOfBytesToRead);
 #if defined DEBUG_ANDROID_SERIAL
@@ -379,8 +385,10 @@ SetFilePointer(HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, D
 	int seekResult = -1;
 	if (hFile->handleType == HANDLE_TYPE_FILE) {
 		seekResult = (int) lseek(hFile->fileDescriptor, lDistanceToMove, moveMode);
+#if defined(__ANDROID__)
 	} else if (hFile->handleType == HANDLE_TYPE_FILE_ASSET) {
 		seekResult = (int) AAsset_seek64(hFile->fileAsset, lDistanceToMove, moveMode);
+#endif
 	}
 	return seekResult < 0 ? INVALID_SET_FILE_POINTER : seekResult;
 }
@@ -403,8 +411,10 @@ DWORD GetFileSize(HANDLE hFile, LPDWORD lpFileSizeHigh) {
 		off_t fileLength = lseek(hFile->fileDescriptor, 0, SEEK_END); // + 1;
 		lseek(hFile->fileDescriptor, currentPosition, SEEK_SET);
 		return (DWORD) fileLength;
+#if defined(__ANDROID__)
 	} else if (hFile->handleType == HANDLE_TYPE_FILE_ASSET) {
 		return (DWORD) AAsset_getLength64(hFile->fileAsset);
+#endif
 	}
 	return 0;
 }
@@ -425,9 +435,11 @@ CreateFileMapping(HANDLE hFile, LPSECURITY_ATTRIBUTES lpFileMappingAttributes, D
 		else
 			handle->handleType = HANDLE_TYPE_FILE_MAPPING;
 		handle->fileDescriptor = hFile->fileDescriptor;
+#if defined(__ANDROID__)
 	} else if (hFile->handleType == HANDLE_TYPE_FILE_ASSET) {
 		handle->handleType = HANDLE_TYPE_FILE_MAPPING_ASSET;
 		handle->fileAsset = hFile->fileAsset;
+#endif
 	}
 	if (dwMaximumSizeHigh == 0 && dwMaximumSizeLow == 0) {
 		dwMaximumSizeLow = GetFileSize(hFile, &dwMaximumSizeHigh);
@@ -465,12 +477,14 @@ LPVOID MapViewOfFile(HANDLE hFileMappingObject, DWORD dwDesiredAccess, DWORD dwF
 		                                   hFileMappingObject->fileMappingAddress,
 		                                   numberOfBytesToRead);
 		lseek(hFileMappingObject->fileDescriptor, currentPosition, SEEK_SET);
+#if defined(__ANDROID__)
 	} else if (hFileMappingObject->handleType == HANDLE_TYPE_FILE_MAPPING_ASSET) {
 		if (dwDesiredAccess & FILE_MAP_WRITE)
 			return NULL;
 		hFileMappingObject->fileMappingAddress = (LPVOID) (
 				AAsset_getBuffer(hFileMappingObject->fileAsset) +
 				hFileMappingObject->fileMappingOffset);
+#endif
 	}
 	if (hFileMappingObject->fileMappingAddress) {
 		for (int i = 0; i < MAX_FILE_MAPPING_HANDLE; ++i) {
@@ -649,7 +663,11 @@ int UnlockedWaitForEvent(HANDLE hHandle, uint64_t milliseconds) {
 	return result;
 }
 
+#if defined(__ANDROID__)
 extern int jniDetachCurrentThread();
+#else
+static int jniDetachCurrentThread(void) { return 0; }
+#endif
 
 // Should be protected by mutex
 #define MAX_CREATED_THREAD 30
@@ -798,6 +816,7 @@ BOOL WINAPI CloseHandle(HANDLE hObject) {
 
 			break;
 		}
+#if defined(__ANDROID__)
 		case HANDLE_TYPE_FILE_ASSET: {
 			FILE_LOGD("CloseHandle() HANDLE_TYPE_FILE_ASSET");
 			AAsset_close(hObject->fileAsset);
@@ -806,6 +825,7 @@ BOOL WINAPI CloseHandle(HANDLE hObject) {
 			free(hObject);
 			return TRUE;
 		}
+#endif
 		case HANDLE_TYPE_FILE_MAPPING:
 		case HANDLE_TYPE_FILE_MAPPING_CONTENT:
 		case HANDLE_TYPE_FILE_MAPPING_ASSET: {
@@ -1268,6 +1288,8 @@ BOOL GetSystemPowerStatus(LPSYSTEM_POWER_STATUS status) {
 
 // Wave API
 
+#if defined(__ANDROID__)
+
 #if defined NEW_WIN32_SOUND_ENGINE
 // this callback handler is called every time a buffer finishes playing
 void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
@@ -1692,6 +1714,48 @@ MMRESULT waveOutWrite(HWAVEOUT hwo, LPWAVEHDR pwh, UINT cbwh) {
 
 	return MMSYSERR_NOERROR;
 }
+
+#else
+
+/* Initial browser backend: preserve WinMM control flow while remaining silent.
+ * WebAudio will replace this once the emulator runtime is linked and running.
+ */
+MMRESULT waveOutOpen(LPHWAVEOUT phwo, UINT uDeviceID, LPCWAVEFORMATEX pwfx, DWORD_PTR dwCallback,
+                     DWORD_PTR dwInstance, DWORD fdwOpen) {
+	HWAVEOUT handle = (HWAVEOUT) calloc(1, sizeof(struct _HWAVEOUT));
+	if (!handle)
+		return MMSYSERR_ERROR;
+	handle->pwfx = (WAVEFORMATEX *) pwfx;
+	handle->uDeviceID = uDeviceID;
+	handle->dwCallback = dwCallback;
+	*phwo = handle;
+	return MMSYSERR_NOERROR;
+}
+
+MMRESULT waveOutReset(HWAVEOUT hwo) {
+	return MMSYSERR_NOERROR;
+}
+
+MMRESULT waveOutClose(HWAVEOUT handle) {
+	free(handle);
+	return MMSYSERR_NOERROR;
+}
+
+MMRESULT waveOutPrepareHeader(HWAVEOUT hwo, LPWAVEHDR pwh, UINT cbwh) {
+	return MMSYSERR_NOERROR;
+}
+
+MMRESULT waveOutUnprepareHeader(HWAVEOUT hwo, LPWAVEHDR pwh, UINT cbwh) {
+	return MMSYSERR_NOERROR;
+}
+
+MMRESULT waveOutWrite(HWAVEOUT hwo, LPWAVEHDR pwh, UINT cbwh) {
+	if (hwo && hwo->dwCallback)
+		PostThreadMessage(hwo->dwCallback, MM_WOM_DONE, (WPARAM) hwo, (LPARAM) pwh);
+	return MMSYSERR_NOERROR;
+}
+
+#endif /* __ANDROID__ */
 
 
 MMRESULT waveOutGetDevCaps(UINT_PTR uDeviceID, LPWAVEOUTCAPS pwoc, UINT cbwoc) {
