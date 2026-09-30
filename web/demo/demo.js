@@ -1,17 +1,68 @@
 import createWebEmu48 from "./webemu48.js";
 
+const modelSelect = document.querySelector("#model");
 const romInput = document.querySelector("#rom");
 const startButton = document.querySelector("#start");
 const calculator = document.querySelector("#calculator");
+const skin = document.querySelector("#skin");
 const canvas = document.querySelector("#lcd");
 const ctx = canvas.getContext("2d", { alpha: false });
 const log = document.querySelector("#log");
 const bootstrapStatus = document.querySelector("#bootstrap-status");
 
+const MODELS = {
+  "39gp": {
+    label: "HP 39g+",
+    kml: "real39gp-lc.kml",
+    skin: "real39gp-lc.png",
+    width: 444,
+    height: 884,
+    lcd: { x: 25, y: 21, width: 393, height: 192 },
+    power: { x: 46, y: 837 }
+  },
+  "39gs": {
+    label: "HP 39gs",
+    kml: "real39gs-lc.kml",
+    skin: "real39gs-lc.png",
+    width: 444,
+    height: 887,
+    lcd: { x: 25, y: 21, width: 393, height: 192 },
+    power: { x: 46, y: 838 }
+  },
+  "40gs": {
+    label: "HP 40gs",
+    kml: "real40gs-lc.kml",
+    skin: "real40gs-lc.png",
+    width: 444,
+    height: 889,
+    lcd: { x: 25, y: 21, width: 393, height: 192 },
+    power: { x: 51, y: 839 }
+  }
+};
+
 let moduleInstance = null;
 let running = false;
 let activePointerId = null;
 let lastPointer = { x: 0, y: 0 };
+
+function selectedModel() {
+  return MODELS[modelSelect.value] || MODELS["39gp"];
+}
+
+function applyModelVisual() {
+  const model = selectedModel();
+  calculator.style.aspectRatio = `${model.width} / ${model.height}`;
+  calculator.setAttribute("aria-label", `Clickable ${model.label} emulator`);
+  skin.src = `./${model.skin}`;
+  skin.alt = `${model.label} emulator skin`;
+
+  canvas.style.left = `${model.lcd.x / model.width * 100}%`;
+  canvas.style.top = `${model.lcd.y / model.height * 100}%`;
+  canvas.style.width = `${model.lcd.width / model.width * 100}%`;
+  canvas.style.height = `${model.lcd.height / model.height * 100}%`;
+
+  startButton.textContent = `Start ${model.label.replace("HP ", "")}`;
+}
 
 function writeLog(message) {
   log.textContent += "\n" + message;
@@ -61,18 +112,30 @@ async function waitForShutdown(timeoutMs = 5000) {
   );
 }
 
-async function pressPowerOn() {
-  // real39gp-lc.kml Button 101 (ON) hit region center.
-  moduleInstance._webemu48_button_down(46, 837);
+async function pressPowerOn(model) {
+  moduleInstance._webemu48_button_down(model.power.x, model.power.y);
   await new Promise(resolve => setTimeout(resolve, 300));
-  moduleInstance._webemu48_button_up(46, 837);
+  moduleInstance._webemu48_button_up(model.power.x, model.power.y);
 }
 
 function toKmlCoordinates(event) {
   const rect = calculator.getBoundingClientRect();
+  const model = selectedModel();
   return {
-    x: Math.max(0, Math.min(443, Math.floor((event.clientX - rect.left) * 444 / rect.width))),
-    y: Math.max(0, Math.min(883, Math.floor((event.clientY - rect.top) * 884 / rect.height)))
+    x: Math.max(
+      0,
+      Math.min(
+        model.width - 1,
+        Math.floor((event.clientX - rect.left) * model.width / rect.width)
+      )
+    ),
+    y: Math.max(
+      0,
+      Math.min(
+        model.height - 1,
+        Math.floor((event.clientY - rect.top) * model.height / rect.height)
+      )
+    )
   };
 }
 
@@ -120,6 +183,7 @@ async function bootModule() {
 }
 
 async function startCalculator() {
+  const model = selectedModel();
   const file = romInput.files?.[0];
   if (!file) {
     writeLog("Select a ROM image first.");
@@ -127,6 +191,8 @@ async function startCalculator() {
   }
 
   startButton.disabled = true;
+  modelSelect.disabled = true;
+  romInput.disabled = true;
   const bytes = new Uint8Array(await file.arrayBuffer());
   ensureDirectory(moduleInstance.FS, "/calculators");
 
@@ -157,11 +223,13 @@ async function startCalculator() {
     "webemu48_new_document",
     "number",
     ["string", "string"],
-    ["real39gp-lc.kml", "/calculators/"]
+    [model.kml, "/calculators/"]
   );
   if (!opened) {
-    writeLog("NewDocument() failed. Check the selected ROM.");
+    writeLog(`NewDocument() failed for ${model.label}. Check the selected ROM.`);
     startButton.disabled = false;
+    modelSelect.disabled = false;
+    romInput.disabled = false;
     return;
   }
 
@@ -169,10 +237,10 @@ async function startCalculator() {
   await waitForState(0);
   await waitForShutdown();
 
-  writeLog("Powering on calculator…");
-  await pressPowerOn();
+  writeLog(`Powering on ${model.label}…`);
+  await pressPowerOn(model);
 
-  writeLog("Emulator started. The calculator image is now clickable.");
+  writeLog(`${model.label} started. The calculator image is now clickable.`);
   running = true;
   requestAnimationFrame(renderLoop);
 }
@@ -215,7 +283,9 @@ calculator.addEventListener("lostpointercapture", event => {
   }
 });
 
+modelSelect.addEventListener("change", applyModelVisual);
 startButton.addEventListener("click", startCalculator);
+applyModelVisual();
 
 bootModule().catch(error => {
   bootstrapStatus.textContent = "Runtime failed to load.";
