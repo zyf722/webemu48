@@ -91,6 +91,15 @@ try {
 
   await waitForState(moduleInstance, 0);
 
+  /*
+   * A freshly-created calculator can begin with the LCD powered off.
+   * Exercise the real KML ON key hit region rather than forcing emulator state.
+   */
+  await sleep(250);
+  moduleInstance._webemu48_button_down(46, 837);
+  await sleep(120);
+  moduleInstance._webemu48_button_up(46, 837);
+
   const deadline = performance.now() + 12000;
   let lastState = moduleInstance._webemu48_state();
 
