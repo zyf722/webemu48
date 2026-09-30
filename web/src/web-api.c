@@ -256,43 +256,27 @@ static BYTE webemu48_lcd_rgba_buffer[
     WEBEMU48_LCD_WIDTH * WEBEMU48_LCD_MAX_HEIGHT * 4
 ];
 
+static BYTE webemu48_binary_pixel(const BYTE *nibbles, int nibbleCount, int sourceX)
+{
+    if (!nibbles || sourceX < 0 || sourceX >= nibbleCount * 4)
+        return 0;
+
+    const BYTE nibble = nibbles[sourceX >> 2] & 0x0F;
+    return (nibble >> (sourceX & 3)) & 1;
+}
+
 WEBEMU48_EXPORT
 int webemu48_lcd_refresh(void)
 {
-    /*
-     * Rebuild the logical LCD from the calculator's current display memory.
-     * The native port normally maintains hLcdDC incrementally through GDI
-     * write notifications. In a browser those notifications can miss the
-     * initial boot redraw, leaving the DIB stale even though the ROM has
-     * enabled the display. A full 64/80-line rebuild is cheap and makes the
-     * framebuffer snapshot authoritative.
-     */
-    if (Chipset.IORam[BITOFFSET] & DON) {
-        UpdateMainDisplay();
-        UpdateMenuDisplay();
-        if (Chipset.d0size)
-            RefreshDisp0();
-    }
-
-    if (!hLcdDC || !hLcdDC->selectedBitmap)
+    if (!hLcdDC || !hLcdDC->selectedBitmap ||
+        !hLcdDC->selectedBitmap->bitmapInfoHeader)
         return FALSE;
 
-    HBITMAP bitmap = hLcdDC->selectedBitmap;
-    if (!bitmap->bitmapInfoHeader || !bitmap->bitmapBits)
-        return FALSE;
-
-    const BITMAPINFOHEADER *header = bitmap->bitmapInfoHeader;
-    if (header->biBitCount != 8 || header->biWidth <= 0)
-        return FALSE;
-
-    const int sourceWidth = header->biWidth;
+    const BITMAPINFOHEADER *header =
+        hLcdDC->selectedBitmap->bitmapInfoHeader;
     const int sourceHeight = abs(header->biHeight);
     if (sourceHeight <= 0 || sourceHeight > WEBEMU48_LCD_MAX_HEIGHT)
         return FALSE;
-
-    const int sourceStride =
-        4 * ((sourceWidth * header->biBitCount + 31) / 32);
-    const BYTE *source = (const BYTE *) bitmap->bitmapBits;
 
     HPALETTE palette = hLcdDC->realizedPalette ?
         hLcdDC->realizedPalette : hLcdDC->selectedPalette;
@@ -303,26 +287,50 @@ int webemu48_lcd_refresh(void)
         entryCount = palette->paletteLog->palNumEntries;
     }
 
+    const BOOL displayOn = (Chipset.IORam[BITOFFSET] & DON) != 0;
     const int headerRows = Chipset.d0size;
     const int mainRows = MAINSCREENHEIGHT;
+    BYTE row[36];
 
     /*
-     * Browser-side LCD snapshots are intentionally lock-free. Waiting on the
-     * emulator thread's LCD critical section can block the browser event loop;
-     * a snapshot may tear by at most one emulated frame instead.
+     * The browser framebuffer is rebuilt directly from the emulated display
+     * memory instead of depending on the Win32 GDI compatibility bitmap.
+     * Native Emu48 maintains that bitmap incrementally; in the Web port the
+     * initial boot can leave it stale even though the ROM has a valid active
+     * display. Reconstructing 131x64/80 pixels is cheap and avoids GDI locks.
+     *
+     * This first browser bring-up uses the binary LCD path (palette indices
+     * 0/1), matching the default non-grayscale Emu48 mode.
      */
     for (int y = 0; y < sourceHeight; ++y) {
+        memset(row, 0, sizeof(row));
+
         int sourceX = 0;
-        if (y < headerRows)
+        int nibbleCount = 0;
+
+        if (displayOn && y < headerRows && Chipset.d0memory) {
+            const BYTE *headerRow = Chipset.d0memory + y * 34;
+            memcpy(row, headerRow, 34);
             sourceX = Chipset.d0offset;
-        else if (y < headerRows + mainRows)
+            nibbleCount = 34;
+        } else if (displayOn && y < headerRows + mainRows) {
+            const DWORD address =
+                Chipset.start1 + (DWORD)(y - headerRows) * Chipset.width;
+            Npeek(row, address, 36);
             sourceX = Chipset.boffset;
+            nibbleCount = 36;
+        } else if (displayOn && y < headerRows + mainRows + MENUHEIGHT) {
+            const DWORD address =
+                Chipset.start2 +
+                (DWORD)(y - headerRows - mainRows) * 34;
+            Npeek(row, address, 34);
+            sourceX = 0;
+            nibbleCount = 34;
+        }
 
         for (int x = 0; x < WEBEMU48_LCD_WIDTH; ++x) {
-            const int sx = sourceX + x;
-            BYTE index = 0;
-            if (sx >= 0 && sx < sourceWidth)
-                index = source[y * sourceStride + sx];
+            const BYTE index = nibbleCount ?
+                webemu48_binary_pixel(row, nibbleCount, sourceX + x) : 0;
 
             BYTE red;
             BYTE green;
@@ -332,7 +340,7 @@ int webemu48_lcd_refresh(void)
                 green = entries[index].peGreen;
                 blue = entries[index].peBlue;
             } else {
-                red = green = blue = index;
+                red = green = blue = index ? 0 : 255;
             }
 
             BYTE *destination =
