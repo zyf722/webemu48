@@ -69,3 +69,21 @@ if(EMSCRIPTEN)
         -Wno-int-conversion
     )
 endif()
+
+
+if(EMSCRIPTEN)
+    add_executable(webemu48_link_probe
+        src/link_probe.c
+        $<TARGET_OBJECTS:webemu48_core_probe>
+    )
+
+    target_link_options(webemu48_link_probe PRIVATE
+        -pthread
+        "-sERROR_ON_UNDEFINED_SYMBOLS=1"
+    )
+
+    set_target_properties(webemu48_link_probe PROPERTIES
+        OUTPUT_NAME "webemu48-link-probe"
+        SUFFIX ".js"
+    )
+endif()
