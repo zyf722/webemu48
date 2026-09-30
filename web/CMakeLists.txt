@@ -91,3 +91,30 @@ if(EMSCRIPTEN)
         SUFFIX ".js"
     )
 endif()
+
+
+if(EMSCRIPTEN)
+    add_executable(webemu48
+        src/browser_main.c
+        $<TARGET_OBJECTS:webemu48_core_probe>
+    )
+
+    target_link_options(webemu48 PRIVATE
+        -pthread
+        "-sPTHREAD_POOL_SIZE=4"
+        "-sERROR_ON_UNDEFINED_SYMBOLS=1"
+        "-sMODULARIZE=1"
+        "-sEXPORT_ES6=1"
+        "-sEXPORT_NAME=createWebEmu48"
+        "-sENVIRONMENT=web,worker"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sEXIT_RUNTIME=0"
+        "-sFORCE_FILESYSTEM=1"
+        "-sEXPORTED_RUNTIME_METHODS=['FS']"
+    )
+
+    set_target_properties(webemu48 PROPERTIES
+        OUTPUT_NAME "webemu48"
+        SUFFIX ".js"
+    )
+endif()

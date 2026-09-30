@@ -209,3 +209,108 @@ int webemu48_view_height_get(void)
 {
     return webemu48_view_height;
 }
+
+
+#define WEBEMU48_LCD_WIDTH 131
+#define WEBEMU48_LCD_MAX_HEIGHT 80
+
+static BYTE webemu48_lcd_rgba_buffer[
+    WEBEMU48_LCD_WIDTH * WEBEMU48_LCD_MAX_HEIGHT * 4
+];
+
+WEBEMU48_EXPORT
+int webemu48_lcd_refresh(void)
+{
+    if (!hLcdDC || !hLcdDC->selectedBitmap)
+        return FALSE;
+
+    HBITMAP bitmap = hLcdDC->selectedBitmap;
+    if (!bitmap->bitmapInfoHeader || !bitmap->bitmapBits)
+        return FALSE;
+
+    const BITMAPINFOHEADER *header = bitmap->bitmapInfoHeader;
+    if (header->biBitCount != 8 || header->biWidth <= 0)
+        return FALSE;
+
+    const int sourceWidth = header->biWidth;
+    const int sourceHeight = abs(header->biHeight);
+    if (sourceHeight <= 0 || sourceHeight > WEBEMU48_LCD_MAX_HEIGHT)
+        return FALSE;
+
+    const int sourceStride =
+        4 * ((sourceWidth * header->biBitCount + 31) / 32);
+    const BYTE *source = (const BYTE *) bitmap->bitmapBits;
+
+    HPALETTE palette = hLcdDC->realizedPalette ?
+        hLcdDC->realizedPalette : hLcdDC->selectedPalette;
+    const PALETTEENTRY *entries = NULL;
+    UINT entryCount = 0;
+    if (palette && palette->paletteLog) {
+        entries = palette->paletteLog->palPalEntry;
+        entryCount = palette->paletteLog->palNumEntries;
+    }
+
+    const int headerRows = Chipset.d0size;
+    const int mainRows = MAINSCREENHEIGHT;
+
+    EnterCriticalSection(&csLcdLock);
+
+    for (int y = 0; y < sourceHeight; ++y) {
+        int sourceX = 0;
+        if (y < headerRows)
+            sourceX = Chipset.d0offset;
+        else if (y < headerRows + mainRows)
+            sourceX = Chipset.boffset;
+
+        for (int x = 0; x < WEBEMU48_LCD_WIDTH; ++x) {
+            const int sx = sourceX + x;
+            BYTE index = 0;
+            if (sx >= 0 && sx < sourceWidth)
+                index = source[y * sourceStride + sx];
+
+            BYTE red;
+            BYTE green;
+            BYTE blue;
+            if (entries && index < entryCount) {
+                red = entries[index].peRed;
+                green = entries[index].peGreen;
+                blue = entries[index].peBlue;
+            } else {
+                red = green = blue = index;
+            }
+
+            BYTE *destination =
+                &webemu48_lcd_rgba_buffer[
+                    (y * WEBEMU48_LCD_WIDTH + x) * 4
+                ];
+            destination[0] = red;
+            destination[1] = green;
+            destination[2] = blue;
+            destination[3] = 255;
+        }
+    }
+
+    LeaveCriticalSection(&csLcdLock);
+    return TRUE;
+}
+
+WEBEMU48_EXPORT
+const BYTE *webemu48_lcd_rgba(void)
+{
+    return webemu48_lcd_rgba_buffer;
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_width(void)
+{
+    return WEBEMU48_LCD_WIDTH;
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_height(void)
+{
+    if (!hLcdDC || !hLcdDC->selectedBitmap ||
+        !hLcdDC->selectedBitmap->bitmapInfoHeader)
+        return 0;
+    return abs(hLcdDC->selectedBitmap->bitmapInfoHeader->biHeight);
+}
