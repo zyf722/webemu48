@@ -110,7 +110,7 @@ if(EMSCRIPTEN)
         "-sALLOW_MEMORY_GROWTH=1"
         "-sEXIT_RUNTIME=0"
         "-sFORCE_FILESYSTEM=1"
-        "-sEXPORTED_RUNTIME_METHODS=['FS','ccall']"
+        "-sEXPORTED_RUNTIME_METHODS=['FS','ccall','HEAPU8']"
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real39gp-lc.kml@/calculators/real39gp-lc.kml"
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real39gp-lc.png@/calculators/real39gp-lc.png"
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/keyb3940.kmi@/calculators/keyb3940.kmi"
