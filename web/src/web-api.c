@@ -417,3 +417,98 @@ int webemu48_lcd_raw_max(void)
 
     return maximum;
 }
+
+static int webemu48_visible_raw_extreme(BOOL wantMaximum)
+{
+    if (!hLcdDC || !hLcdDC->selectedBitmap ||
+        !hLcdDC->selectedBitmap->bitmapInfoHeader ||
+        !hLcdDC->selectedBitmap->bitmapBits)
+        return -1;
+
+    const BITMAPINFOHEADER *header = hLcdDC->selectedBitmap->bitmapInfoHeader;
+    const int sourceWidth = header->biWidth;
+    const int sourceHeight = abs(header->biHeight);
+    const int stride = 4 * ((sourceWidth * header->biBitCount + 31) / 32);
+    const BYTE *bits = (const BYTE *) hLcdDC->selectedBitmap->bitmapBits;
+    int extreme = wantMaximum ? 0 : 255;
+
+    for (int y = 0; y < sourceHeight; ++y) {
+        int sourceX = 0;
+        if (y < Chipset.d0size)
+            sourceX = Chipset.d0offset;
+        else if (y < Chipset.d0size + MAINSCREENHEIGHT)
+            sourceX = Chipset.boffset;
+
+        for (int x = 0; x < WEBEMU48_LCD_WIDTH; ++x) {
+            const int sx = sourceX + x;
+            if (sx < 0 || sx >= sourceWidth)
+                continue;
+            const int value = bits[y * stride + sx];
+            if (wantMaximum) {
+                if (value > extreme) extreme = value;
+            } else {
+                if (value < extreme) extreme = value;
+            }
+        }
+    }
+
+    return extreme;
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_visible_raw_min(void)
+{
+    return webemu48_visible_raw_extreme(FALSE);
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_visible_raw_max(void)
+{
+    return webemu48_visible_raw_extreme(TRUE);
+}
+
+WEBEMU48_EXPORT
+int webemu48_contrast(void)
+{
+    return (int) Chipset.contrast;
+}
+
+static unsigned int webemu48_palette_rgb(int index)
+{
+    HPALETTE palette = NULL;
+    if (hLcdDC)
+        palette = hLcdDC->realizedPalette ? hLcdDC->realizedPalette : hLcdDC->selectedPalette;
+
+    if (!palette || !palette->paletteLog ||
+        index < 0 || index >= palette->paletteLog->palNumEntries)
+        return 0xFFFFFFFFu;
+
+    const PALETTEENTRY *entry = &palette->paletteLog->palPalEntry[index];
+    return ((unsigned int)entry->peRed << 16) |
+           ((unsigned int)entry->peGreen << 8) |
+           (unsigned int)entry->peBlue;
+}
+
+WEBEMU48_EXPORT
+unsigned int webemu48_palette0_rgb(void)
+{
+    return webemu48_palette_rgb(0);
+}
+
+WEBEMU48_EXPORT
+unsigned int webemu48_palette1_rgb(void)
+{
+    return webemu48_palette_rgb(1);
+}
+
+WEBEMU48_EXPORT
+int webemu48_boffset(void)
+{
+    return (int) Chipset.boffset;
+}
+
+WEBEMU48_EXPORT
+int webemu48_d0offset(void)
+{
+    return (int) Chipset.d0offset;
+}
