@@ -3,6 +3,27 @@ import createWebEmu48 from "./webemu48.js";
 const root = document.documentElement;
 const status = document.querySelector("#status");
 
+const MODELS = {
+  "39gp": {
+    label: "HP 39g+",
+    kml: "real39gp-lc.kml",
+    power: { x: 46, y: 837 }
+  },
+  "39gs": {
+    label: "HP 39gs",
+    kml: "real39gs-lc.kml",
+    power: { x: 46, y: 838 }
+  },
+  "40gs": {
+    label: "HP 40gs",
+    kml: "real40gs-lc.kml",
+    power: { x: 51, y: 839 }
+  }
+};
+
+const modelId = new URLSearchParams(location.search).get("model") || "39gp";
+const model = MODELS[modelId];
+
 function setStatus(state, message) {
   root.dataset.smoke = state;
   status.textContent = message;
@@ -70,7 +91,8 @@ function hasPixelVariation(heap, pointer, width, height) {
 }
 
 try {
-  setStatus("loading", "Loading WebAssembly module");
+  if (!model) throw new Error(`Unknown smoke model: ${modelId}`);
+  setStatus("loading", `Loading WebAssembly module for ${model.label}`);
 
   const moduleInstance = await createWebEmu48({
     locateFile(path) {
@@ -106,7 +128,7 @@ try {
     "webemu48_new_document",
     "number",
     ["string", "string"],
-    ["real39gp-lc.kml", "/calculators/"]
+    [model.kml, "/calculators/"]
   );
   if (!opened) throw new Error("webemu48_new_document() returned false");
 
@@ -118,9 +140,9 @@ try {
    * Exercise the real KML ON key hit region only after the worker has reached
    * that state; a fixed delay races Emscripten pthread startup.
    */
-  moduleInstance._webemu48_button_down(46, 837);
+  moduleInstance._webemu48_button_down(model.power.x, model.power.y);
   await sleep(300);
-  moduleInstance._webemu48_button_up(46, 837);
+  moduleInstance._webemu48_button_up(model.power.x, model.power.y);
 
   const deadline = performance.now() + 15000;
   let lastState = moduleInstance._webemu48_state();
@@ -142,7 +164,7 @@ try {
     ) {
       setStatus(
         "pass",
-        `PASS state=${lastState} lcd=${width}x${height}`
+        `PASS model=${modelId} state=${lastState} lcd=${width}x${height}`
       );
       break;
     }
@@ -158,7 +180,9 @@ try {
       width: moduleInstance._webemu48_lcd_width(),
       height: moduleInstance._webemu48_lcd_height()
     };
-    throw new Error("LCD never became non-uniform; " + JSON.stringify(diagnostics));
+    throw new Error(
+      `${model.label} LCD never became non-uniform; ` + JSON.stringify(diagnostics)
+    );
   }
 } catch (error) {
   console.error(error);
