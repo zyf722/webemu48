@@ -122,6 +122,15 @@ static LRESULT OnLButtonUp(UINT nFlags, WORD x, WORD y)
 	return 0;
 }
 
+void draw(void)
+{
+    /*
+     * Win32 compatibility code calls this from InvalidateRect().
+     * The browser frontend renders the LCD directly from emulated display
+     * memory, so no GDI paint pass is required here.
+     */
+}
+
 BOOL buttonDown(int x, int y) {
     return OnLButtonDown(MK_LBUTTON, x, y);
 }
