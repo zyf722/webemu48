@@ -120,7 +120,17 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real40gs-lc.kml@/calculators/real40gs-lc.kml"
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real40gs-lc.png@/calculators/real40gs-lc.png"
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/40gs.ico@/calculators/40gs.ico"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real48gii-lc.kml@/calculators/real48gii-lc.kml"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real48gii-lc.png@/calculators/real48gii-lc.png"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/48gii.ico@/calculators/48gii.ico"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real49gp-lc.kml@/calculators/real49gp-lc.kml"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real49gp-lc.png@/calculators/real49gp-lc.png"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/49gp.ico@/calculators/49gp.ico"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real50g-lc.kml@/calculators/real50g-lc.kml"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/real50g-lc.png@/calculators/real50g-lc.png"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/50g.ico@/calculators/50g.ico"
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/keyb3940.kmi@/calculators/keyb3940.kmi"
+        "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/keyb4950.kmi@/calculators/keyb4950.kmi"
         "SHELL:--preload-file ${CMAKE_CURRENT_LIST_DIR}/../app/src/main/assets/calculators/patch.39g@/calculators/patch.39g"
     )
 

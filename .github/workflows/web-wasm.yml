@@ -55,6 +55,9 @@ jobs:
           cp app/src/main/assets/calculators/real39gp-lc.png dist/
           cp app/src/main/assets/calculators/real39gs-lc.png dist/
           cp app/src/main/assets/calculators/real40gs-lc.png dist/
+          cp app/src/main/assets/calculators/real48gii-lc.png dist/
+          cp app/src/main/assets/calculators/real49gp-lc.png dist/
+          cp app/src/main/assets/calculators/real50g-lc.png dist/
 
       - name: Upload browser demo
         uses: actions/upload-artifact@v4
@@ -73,6 +76,9 @@ jobs:
           - 39gp
           - 39gs
           - 40gs
+          - 48gii
+          - 49gp
+          - 50g
     steps:
       - uses: actions/checkout@v4
 
@@ -87,6 +93,7 @@ jobs:
           cp web/demo/smoke.html dist/
           cp web/demo/smoke.js dist/
           cp app/src/main/assets/calculators/rom.39g dist/rom.39g
+          cp app/src/main/assets/calculators/rom.49g dist/rom.49g
 
       - name: Start cross-origin-isolated server
         run: |

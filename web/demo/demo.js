@@ -13,6 +13,7 @@ const bootstrapStatus = document.querySelector("#bootstrap-status");
 const MODELS = {
   "39gp": {
     label: "HP 39g+",
+    rom: "rom.39g",
     kml: "real39gp-lc.kml",
     skin: "real39gp-lc.png",
     width: 444,
@@ -22,6 +23,7 @@ const MODELS = {
   },
   "39gs": {
     label: "HP 39gs",
+    rom: "rom.39g",
     kml: "real39gs-lc.kml",
     skin: "real39gs-lc.png",
     width: 444,
@@ -31,12 +33,43 @@ const MODELS = {
   },
   "40gs": {
     label: "HP 40gs",
+    rom: "rom.39g",
     kml: "real40gs-lc.kml",
     skin: "real40gs-lc.png",
     width: 444,
     height: 889,
     lcd: { x: 25, y: 21, width: 393, height: 192 },
     power: { x: 51, y: 839 }
+  },
+  "48gii": {
+    label: "HP 48gII",
+    rom: "rom.49g",
+    kml: "real48gii-lc.kml",
+    skin: "real48gii-lc.png",
+    width: 444,
+    height: 885,
+    lcd: { x: 25, y: 21, width: 393, height: 192 },
+    power: { x: 51, y: 839 }
+  },
+  "49gp": {
+    label: "HP 49g+",
+    rom: "rom.49g",
+    kml: "real49gp-lc.kml",
+    skin: "real49gp-lc.png",
+    width: 443,
+    height: 944,
+    lcd: { x: 25, y: 20, width: 393, height: 240 },
+    power: { x: 44, y: 899 }
+  },
+  "50g": {
+    label: "HP 50g",
+    rom: "rom.49g",
+    kml: "real50g-lc.kml",
+    skin: "real50g-lc.png",
+    width: 437,
+    height: 940,
+    lcd: { x: 22, y: 22, width: 393, height: 240 },
+    power: { x: 44, y: 894 }
   }
 };
 
@@ -196,13 +229,16 @@ async function startCalculator() {
   const bytes = new Uint8Array(await file.arrayBuffer());
   ensureDirectory(moduleInstance.FS, "/calculators");
 
+  const romPath = `/calculators/${model.rom}`;
   try {
-    moduleInstance.FS.unlink("/calculators/rom.39g");
+    moduleInstance.FS.unlink(romPath);
   } catch (_) {
   }
-  moduleInstance.FS.writeFile("/calculators/rom.39g", bytes);
+  moduleInstance.FS.writeFile(romPath, bytes);
 
-  writeLog(`ROM loaded into memory: ${bytes.byteLength} bytes`);
+  writeLog(
+    `ROM loaded as ${model.rom}: ${bytes.byteLength} bytes for ${model.label}`
+  );
 
   const initialized = moduleInstance.ccall(
     "webemu48_init",

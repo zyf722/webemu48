@@ -6,18 +6,45 @@ const status = document.querySelector("#status");
 const MODELS = {
   "39gp": {
     label: "HP 39g+",
+    rom: "rom.39g",
     kml: "real39gp-lc.kml",
+    lcdHeight: 64,
     power: { x: 46, y: 837 }
   },
   "39gs": {
     label: "HP 39gs",
+    rom: "rom.39g",
     kml: "real39gs-lc.kml",
+    lcdHeight: 64,
     power: { x: 46, y: 838 }
   },
   "40gs": {
     label: "HP 40gs",
+    rom: "rom.39g",
     kml: "real40gs-lc.kml",
+    lcdHeight: 64,
     power: { x: 51, y: 839 }
+  },
+  "48gii": {
+    label: "HP 48gII",
+    rom: "rom.49g",
+    kml: "real48gii-lc.kml",
+    lcdHeight: 64,
+    power: { x: 51, y: 839 }
+  },
+  "49gp": {
+    label: "HP 49g+",
+    rom: "rom.49g",
+    kml: "real49gp-lc.kml",
+    lcdHeight: 80,
+    power: { x: 44, y: 899 }
+  },
+  "50g": {
+    label: "HP 50g",
+    rom: "rom.49g",
+    kml: "real50g-lc.kml",
+    lcdHeight: 80,
+    power: { x: 44, y: 894 }
   }
 };
 
@@ -104,13 +131,15 @@ try {
     }
   });
 
-  const romResponse = await fetch("./rom.39g");
+  const romResponse = await fetch(`./${model.rom}`);
   if (!romResponse.ok) {
-    throw new Error(`ROM fetch failed: ${romResponse.status}`);
+    throw new Error(
+      `${model.rom} fetch failed: ${romResponse.status}`
+    );
   }
 
   moduleInstance.FS.writeFile(
-    "/calculators/rom.39g",
+    `/calculators/${model.rom}`,
     new Uint8Array(await romResponse.arrayBuffer())
   );
 
@@ -159,7 +188,7 @@ try {
 
     if (
       width === 131 &&
-      height === 64 &&
+      height === model.lcdHeight &&
       hasPixelVariation(moduleInstance.HEAPU8, pointer, width, height)
     ) {
       setStatus(

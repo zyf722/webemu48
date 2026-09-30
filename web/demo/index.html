@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>webemu48 · HP 39g+ preview</title>
+  <title>webemu48 · HP ARM calculator preview</title>
   <style>
     :root {
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -71,7 +71,7 @@
   </style>
 </head>
 <body>
-  <h1>webemu48 · HP 39g+/39gs/40gs preview</h1>
+  <h1>webemu48 · HP ARM calculator preview</h1>
   <p class="muted">
     Experimental WebAssembly port of the Emu48 Android fork.
   </p>
@@ -80,8 +80,8 @@
 
   <p>
     This page does <strong>not</strong> include a calculator ROM. Select your own compatible
-    HP 39g / 39g+ / 39gs / 40gs ROM image; it stays in the browser's in-memory filesystem.
-    The three available skins use the same upstream <code>rom.39g</code> family.
+    ROM image; it stays in the browser's in-memory filesystem. HP 39g+/39gs/40gs use the
+    <code>rom.39g</code> family, while HP 48gII/49g+/50g use the <code>rom.49g</code> family.
   </p>
 
   <div class="row">
@@ -91,6 +91,9 @@
         <option value="39gp">HP 39g+</option>
         <option value="39gs">HP 39gs</option>
         <option value="40gs">HP 40gs</option>
+        <option value="48gii">HP 48gII</option>
+        <option value="49gp">HP 49g+</option>
+        <option value="50g">HP 50g</option>
       </select>
     </label>
     <input id="rom" type="file" />

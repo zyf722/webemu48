@@ -50,6 +50,9 @@ jobs:
           cp app/src/main/assets/calculators/real39gp-lc.png _site/
           cp app/src/main/assets/calculators/real39gs-lc.png _site/
           cp app/src/main/assets/calculators/real40gs-lc.png _site/
+          cp app/src/main/assets/calculators/real48gii-lc.png _site/
+          cp app/src/main/assets/calculators/real49gp-lc.png _site/
+          cp app/src/main/assets/calculators/real50g-lc.png _site/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
