@@ -163,6 +163,7 @@ static DWORD EncodeColorBits(DWORD dwColorVal,DWORD dwMask)
 #undef MAXBIT
 }
 
+#if defined(__ANDROID__)
 extern JavaVM *java_machine;
 extern jobject bitmapMainScreen;
 extern AndroidBitmapInfo androidBitmapInfo;
@@ -227,6 +228,15 @@ static void MakeBitmapTransparent(HBITMAP hBmp,COLORREF color,DWORD dwTol) {
 	if(jniEnv && (ret = AndroidBitmap_unlockPixels(jniEnv, bitmapMainScreen)) < 0)
 		LOGD("AndroidBitmap_unlockPixels() failed ! error=%d", ret);
 }
+
+#else
+static void MakeBitmapTransparent(HBITMAP hBmp, COLORREF color, DWORD dwTol)
+{
+	(void) hBmp;
+	(void) color;
+	(void) dwTol;
+}
+#endif
 
 //
 // WM_PAINT
