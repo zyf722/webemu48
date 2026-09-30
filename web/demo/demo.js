@@ -381,10 +381,9 @@ function renderLoop() {
       }
 
       const byteLength = width * height * 4;
-      const pixels = new Uint8ClampedArray(
-        moduleInstance.HEAPU8.buffer,
-        pointer,
-        byteLength
+      const pixels = new Uint8ClampedArray(byteLength);
+      pixels.set(
+        moduleInstance.HEAPU8.subarray(pointer, pointer + byteLength)
       );
       ctx.putImageData(new ImageData(pixels, width, height), 0, 0);
     }
