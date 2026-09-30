@@ -40,6 +40,8 @@ add_library(webemu48_core_probe OBJECT
     "${EMU48_CPP_DIR}/win32-layer.c"
     "${EMU48_CPP_DIR}/android-emu.c"
     "${EMU48_CPP_DIR}/android-layer.c"
+    src/web-platform.c
+    src/web-api.c
     src/portability_probe.c
 )
 
@@ -63,6 +65,7 @@ target_compile_features(webemu48_core_probe PRIVATE c_std_11)
 
 if(EMSCRIPTEN)
     target_compile_options(webemu48_core_probe PRIVATE
+        -pthread
         -Wno-ignored-pragmas
         -Wno-pointer-sign
         -Wno-incompatible-pointer-types
@@ -79,6 +82,7 @@ if(EMSCRIPTEN)
 
     target_link_options(webemu48_link_probe PRIVATE
         -pthread
+        "-sPTHREAD_POOL_SIZE=4"
         "-sERROR_ON_UNDEFINED_SYMBOLS=1"
     )
 
