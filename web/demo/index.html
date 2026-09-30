@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>webemu48 · 39g+ bring-up</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, sans-serif; color-scheme: light dark; }
+    body { max-width: 880px; margin: 40px auto; padding: 0 20px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    canvas { margin-top: 24px; width: 524px; height: 256px; image-rendering: pixelated;
+      border: 1px solid #888; background: #a8c0b0; }
+    pre { white-space: pre-wrap; background: color-mix(in srgb, CanvasText 8%, Canvas);
+      padding: 12px; border-radius: 8px; min-height: 80px; }
+    button, input { font: inherit; }
+  </style>
+</head>
+<body>
+  <h1>webemu48 · HP 39g+ bring-up</h1>
+  <p>
+    This page does not bundle a calculator ROM. Select a compatible 39g/39g+/39gs/40gs
+    ROM image from your computer; it is copied only into the in-memory Emscripten filesystem.
+  </p>
+  <div class="row">
+    <input id="rom" type="file" />
+    <button id="start" disabled>Start 39g+</button>
+  </div>
+  <canvas id="lcd" width="131" height="64"></canvas>
+  <pre id="log">Loading WebAssembly module…</pre>
+
+  <script type="module" src="./demo.js"></script>
+</body>
+</html>

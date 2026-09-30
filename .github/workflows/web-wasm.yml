@@ -33,3 +33,21 @@ jobs:
 
       - name: Build compile-only probe
         run: cmake --build build/web --parallel 2 --verbose
+
+      - name: Assemble browser demo
+        run: |
+          mkdir -p dist
+          cp build/web/webemu48.js dist/
+          cp build/web/webemu48.wasm dist/
+          cp build/web/webemu48.worker.js dist/
+          cp build/web/webemu48.data dist/
+          cp web/demo/index.html dist/
+          cp web/demo/demo.js dist/
+          cp web/demo/serve.py dist/
+
+      - name: Upload browser demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: webemu48-browser-demo
+          path: dist/
+          if-no-files-found: error
