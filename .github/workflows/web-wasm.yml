@@ -53,6 +53,8 @@ jobs:
           cp web/demo/coi-serviceworker.js dist/
           cp web/demo/serve.py dist/
           cp app/src/main/assets/calculators/real39gp-lc.png dist/
+          cp app/src/main/assets/calculators/real39gs-lc.png dist/
+          cp app/src/main/assets/calculators/real40gs-lc.png dist/
 
       - name: Upload browser demo
         uses: actions/upload-artifact@v4
@@ -64,6 +66,13 @@ jobs:
   browser-runtime-smoke:
     needs: portability-probe
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - 39gp
+          - 39gs
+          - 40gs
     steps:
       - uses: actions/checkout@v4
 
@@ -94,6 +103,8 @@ jobs:
           exit 1
 
       - name: Run Chromium runtime smoke
+        env:
+          SMOKE_MODEL: ${{ matrix.model }}
         run: |
           CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           if [ -z "$CHROME" ]; then
@@ -122,7 +133,9 @@ jobs:
           curl -fsS http://127.0.0.1:9222/json/version >/dev/null
 
           node <<'NODE'
-          const targetUrl = "http://127.0.0.1:8000/smoke.html";
+          const model = process.env.SMOKE_MODEL || "39gp";
+          const targetUrl =
+            "http://127.0.0.1:8000/smoke.html?model=" + encodeURIComponent(model);
           const targetResponse = await fetch(
             "http://127.0.0.1:9222/json/new?" + encodeURIComponent(targetUrl),
             { method: "PUT" }
