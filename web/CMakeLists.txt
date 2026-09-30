@@ -38,6 +38,7 @@ add_library(webemu48_core_probe OBJECT
     "${EMU48_CORE_DIR}/symbfile.c"
     "${EMU48_CORE_DIR}/timer.c"
     "${EMU48_CPP_DIR}/win32-layer.c"
+    "${EMU48_CPP_DIR}/android-emu.c"
     src/portability_probe.c
 )
 
