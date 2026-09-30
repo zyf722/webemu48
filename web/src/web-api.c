@@ -173,6 +173,13 @@ int webemu48_new_document(const char *kmlFilename, const char *baseDirectory)
     chooseCurrentKmlMode = ChooseKmlMode_UNKNOWN;
 
     if (result) {
+        /*
+         * A fresh document starts from a zeroed CHIPSET structure. The native
+         * desktop/Android flow can tolerate that historical behavior, but the
+         * browser bring-up needs the hardware reset state before entering RUN:
+         * interrupts enabled, MMU reset, and the CPU waiting in SHUTDN for ON.
+         */
+        CpuReset();
         mainViewResizeCallback(nBackgroundW, nBackgroundH);
         if (pbyRom && !webemu48_request_run())
             return FALSE;
