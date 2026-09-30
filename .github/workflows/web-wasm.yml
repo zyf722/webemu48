@@ -73,6 +73,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -82,6 +84,9 @@ jobs:
         with:
           name: webemu48-browser-site
           path: dist
+
+      - name: Prepare frontend E2E ROM
+        run: cp app/src/main/assets/calculators/rom.39g dist/rom.39g
 
       - name: Start cross-origin-isolated server
         run: |
@@ -186,7 +191,11 @@ jobs:
           }
 
           async function evaluate(expression) {
-            const result = await cdp("Runtime.evaluate", { expression, returnByValue: true });
+            const result = await cdp("Runtime.evaluate", {
+              expression,
+              returnByValue: true,
+              awaitPromise: true
+            });
             if (result?.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
             return result?.result?.value;
           }
@@ -278,7 +287,97 @@ jobs:
           if (snapshot.aspectRatio !== "665 / 1340") throw new Error("Unexpected calculator aspect ratio: " + snapshot.aspectRatio);
           if (snapshot.tabIndex !== 0) throw new Error("Calculator surface is not keyboard-focusable");
 
-          console.log("PASS frontend UI", snapshot);
+          // Exercise the production frontend with a real file-input ROM load.
+          await evaluate(`(async () => {
+            const select = document.querySelector("#model");
+            select.value = "39gp";
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+
+            const response = await fetch("./rom.39g");
+            if (!response.ok) throw new Error("CI ROM fetch failed: " + response.status);
+            const file = new File(
+              [await response.arrayBuffer()],
+              "rom.39g",
+              { type: "application/octet-stream" }
+            );
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            const input = document.querySelector("#rom");
+            input.files = transfer.files;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            document.querySelector("#start").click();
+            return true;
+          })()`);
+
+          const bootDeadline = Date.now() + 20000;
+          let sessionStatus = "";
+          while (Date.now() < bootDeadline) {
+            sessionStatus = await evaluate(
+              'document.querySelector("#session-status")?.textContent || ""'
+            );
+            if (sessionStatus === "HP 39g+ is running.") break;
+            if (sessionStatus.startsWith("Start failed:")) {
+              throw new Error("Production frontend failed to boot ROM: " + sessionStatus);
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          if (sessionStatus !== "HP 39g+ is running.") {
+            throw new Error("Timed out booting production frontend: " + sessionStatus);
+          }
+
+          const lcdDeadline = Date.now() + 15000;
+          let lcdVaries = false;
+          while (Date.now() < lcdDeadline) {
+            lcdVaries = await evaluate(`(() => {
+              const canvas = document.querySelector("#lcd");
+              const context = canvas?.getContext("2d");
+              if (!canvas || !context) return false;
+              const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+              if (pixels.length < 8) return false;
+              const r = pixels[0], g = pixels[1], b = pixels[2];
+              for (let i = 4; i < pixels.length; i += 4) {
+                if (pixels[i] !== r || pixels[i + 1] !== g || pixels[i + 2] !== b) {
+                  return true;
+                }
+              }
+              return false;
+            })()`);
+            if (lcdVaries) break;
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          if (!lcdVaries) {
+            throw new Error("Production frontend LCD never rendered non-uniform ROM pixels");
+          }
+
+          const keyboardState = JSON.parse(await evaluate(`(() => {
+            const calculator = document.querySelector("#calculator");
+            const oneKey = document.querySelector(
+              '#skin [data-kml-button-id="92"]'
+            );
+            calculator.focus();
+            calculator.dispatchEvent(
+              new KeyboardEvent("keydown", { key: "1", bubbles: true })
+            );
+            const pressed = oneKey?.classList.contains("is-keyboard-pressed") || false;
+            calculator.dispatchEvent(
+              new KeyboardEvent("keyup", { key: "1", bubbles: true })
+            );
+            const released = !(oneKey?.classList.contains("is-keyboard-pressed") || false);
+            return JSON.stringify({ pressed, released });
+          })()`));
+          if (!keyboardState.pressed || !keyboardState.released) {
+            throw new Error(
+              "Production keyboard visual feedback failed: " +
+              JSON.stringify(keyboardState)
+            );
+          }
+
+          console.log("PASS frontend UI + ROM E2E", {
+            ...snapshot,
+            sessionStatus,
+            lcdVaries,
+            keyboardState
+          });
           socket.close();
           NODE
 
