@@ -24,6 +24,7 @@ extern BOOL buttonDown(int x, int y);
 extern void buttonUp(int x, int y);
 extern void keyDown(int virtKey);
 extern void keyUp(int virtKey);
+extern BOOL WebButtonById(UINT nId, BOOL bPressed);
 
 extern CRITICAL_SECTION csGDILock;
 extern CRITICAL_SECTION csLcdLock;
@@ -210,6 +211,18 @@ WEBEMU48_EXPORT
 void webemu48_button_up(int x, int y)
 {
     buttonUp(x, y);
+}
+
+WEBEMU48_EXPORT
+int webemu48_button_id_down(int id)
+{
+    return WebButtonById((UINT) id, TRUE);
+}
+
+WEBEMU48_EXPORT
+int webemu48_button_id_up(int id)
+{
+    return WebButtonById((UINT) id, FALSE);
 }
 
 WEBEMU48_EXPORT

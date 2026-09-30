@@ -28,6 +28,8 @@ type EmuModule = {
   _webemu48_cpu_shutdn(): number;
   _webemu48_button_down(x: number, y: number): number;
   _webemu48_button_up(x: number, y: number): void;
+  _webemu48_button_id_down(id: number): number;
+  _webemu48_button_id_up(id: number): number;
   _webemu48_key_down(virtKey: number): void;
   _webemu48_key_up(virtKey: number): void;
   _webemu48_lcd_refresh(): number;
@@ -52,6 +54,60 @@ const INTERACTIVE_KEY_SELECTOR = [
   "#navigation > #down",
   "#keyboard > g[id^=\"key-\"]"
 ].join(", ");
+
+const SVG_KEY_TO_KML_BUTTON_ID: Record<string, number> = {
+  F1: 11,
+  F2: 12,
+  F3: 13,
+  F4: 14,
+  F5: 15,
+  F6: 16,
+  "key-symb": 21,
+  "key-plot": 22,
+  "key-num": 23,
+  "key-home": 31,
+  "key-aplet": 32,
+  "key-views": 33,
+  "key-vars": 41,
+  "key-math": 42,
+  "key-deriv": 43,
+  "key-xt": 44,
+  "key-del": 45,
+  "key-sin": 51,
+  "key-cos": 52,
+  "key-tan": 53,
+  "key-ln": 54,
+  "key-log": 55,
+  "key-power2": 61,
+  "key-powery": 62,
+  "key-openparen": 63,
+  "key-closeparen": 64,
+  "key-divide": 65,
+  "key-comma": 71,
+  "key-seven": 72,
+  "key-eight": 73,
+  "key-nine": 74,
+  "key-times": 75,
+  "key-alpha": 81,
+  "key-four": 82,
+  "key-five": 83,
+  "key-six": 84,
+  "key-minus": 85,
+  "key-shift": 91,
+  "key-one": 92,
+  "key-two": 93,
+  "key-three": 94,
+  "key-plus": 95,
+  "key-on": 101,
+  "key-zero": 102,
+  "key-dot": 103,
+  "key-negative": 104,
+  "key-enter": 105,
+  right: 110,
+  down: 111,
+  left: 112,
+  up: 113
+};
 
 const MODELS: Record<ModelId, ModelConfig> = {
   "39gp": {
@@ -124,6 +180,7 @@ let moduleInstance: EmuModule | null = null;
 let running = false;
 let activePointerId: number | null = null;
 let activePressPoint: { x: number; y: number } | null = null;
+let activePointerButtonId: number | null = null;
 let frameImageData: ImageData | null = null;
 let activePointerVisualKey: Element | null = null;
 let skinLoadGeneration = 0;
@@ -186,6 +243,13 @@ function installSkinSvg(svgText: string, model: ModelConfig): void {
 
   const lcdPlate = skin.querySelector<SVGElement>("#display rect");
   lcdPlate?.setAttribute("fill", LCD_BACKGROUND);
+
+  for (const [svgId, buttonId] of Object.entries(SVG_KEY_TO_KML_BUTTON_ID)) {
+    skin.querySelector(`#${svgId}`)?.setAttribute(
+      "data-kml-button-id",
+      String(buttonId)
+    );
+  }
 }
 
 async function applyModelVisual(): Promise<void> {
@@ -307,11 +371,13 @@ async function waitForShutdown(timeoutMs = 5000): Promise<void> {
   );
 }
 
-async function pressPowerOn(model: ModelConfig): Promise<void> {
+async function pressPowerOn(_model: ModelConfig): Promise<void> {
   if (!moduleInstance) return;
-  moduleInstance._webemu48_button_down(model.power.x, model.power.y);
+  if (!moduleInstance._webemu48_button_id_down(101)) {
+    throw new Error("KML ON button is unavailable.");
+  }
   await sleep(300);
-  moduleInstance._webemu48_button_up(model.power.x, model.power.y);
+  moduleInstance._webemu48_button_id_up(101);
 }
 
 function toKmlCoordinates(event: PointerEvent): { x: number; y: number } {
@@ -328,12 +394,26 @@ function toKmlCoordinates(event: PointerEvent): { x: number; y: number } {
 function pointerDown(event: PointerEvent): void {
   if (!running || !moduleInstance || activePointerId !== null) return;
   calculator.focus({ preventScroll: true });
-  const point = toKmlCoordinates(event);
-  if (!moduleInstance._webemu48_button_down(point.x, point.y)) return;
+
+  const visualKey = findVisualKey(event.target);
+  const buttonId = visualKey ? SVG_KEY_TO_KML_BUTTON_ID[visualKey.id] : undefined;
+  let point: { x: number; y: number } | null = null;
+  let accepted = false;
+
+  if (buttonId !== undefined) {
+    accepted = moduleInstance._webemu48_button_id_down(buttonId) !== 0;
+  } else {
+    // Preserve KML coordinate hit testing for LCD virtual buttons / hotspots.
+    point = toKmlCoordinates(event);
+    accepted = moduleInstance._webemu48_button_down(point.x, point.y) !== 0;
+  }
+
+  if (!accepted) return;
 
   activePointerId = event.pointerId;
   activePressPoint = point;
-  activePointerVisualKey = findVisualKey(event.target);
+  activePointerButtonId = buttonId ?? null;
+  activePointerVisualKey = visualKey;
   activePointerVisualKey?.classList.add("is-pointer-pressed");
 
   calculator.setPointerCapture?.(event.pointerId);
@@ -343,13 +423,16 @@ function pointerDown(event: PointerEvent): void {
 function releasePointer(event: PointerEvent): void {
   if (!running || !moduleInstance || event.pointerId !== activePointerId) return;
 
-  if (activePressPoint) {
+  if (activePointerButtonId !== null) {
+    moduleInstance._webemu48_button_id_up(activePointerButtonId);
+  } else if (activePressPoint) {
     moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
   }
-  activePointerVisualKey?.classList.remove("is-pointer-pressed");
 
+  activePointerVisualKey?.classList.remove("is-pointer-pressed");
   activePointerId = null;
   activePressPoint = null;
+  activePointerButtonId = null;
   activePointerVisualKey = null;
   event.preventDefault();
 }
@@ -571,13 +654,19 @@ calculator.addEventListener("pointerdown", pointerDown);
 calculator.addEventListener("pointerup", releasePointer);
 calculator.addEventListener("pointercancel", releasePointer);
 calculator.addEventListener("lostpointercapture", event => {
-  if (moduleInstance && event.pointerId === activePointerId && activePressPoint) {
+  if (!moduleInstance || event.pointerId !== activePointerId) return;
+
+  if (activePointerButtonId !== null) {
+    moduleInstance._webemu48_button_id_up(activePointerButtonId);
+  } else if (activePressPoint) {
     moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
-    activePointerVisualKey?.classList.remove("is-pointer-pressed");
-    activePointerId = null;
-    activePressPoint = null;
-    activePointerVisualKey = null;
   }
+
+  activePointerVisualKey?.classList.remove("is-pointer-pressed");
+  activePointerId = null;
+  activePressPoint = null;
+  activePointerButtonId = null;
+  activePointerVisualKey = null;
 });
 calculator.addEventListener("keydown", keyDown);
 calculator.addEventListener("keyup", keyUp);

@@ -2131,6 +2131,25 @@ static VOID ReleaseButtonById(UINT nId)
 	return;
 }
 
+#if defined(WEBEMU48_WEB_PORT)
+BOOL WebButtonById(UINT nId, BOOL bPressed)
+{
+	UINT i;
+	for (i = 0; i < nButtons; ++i)
+	{
+		if (nId == pButton[i].nId)
+		{
+			if (bPressed)
+				PressButton(i);
+			else
+				ReleaseButton(i);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+#endif
+
 static VOID ReleaseAllButtons(VOID)			// release all buttons
 {
 	UINT i;

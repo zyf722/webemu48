@@ -166,12 +166,16 @@ try {
 
   /*
    * A freshly reset calculator waits in SHUTDN for the physical ON key.
-   * Exercise the real KML ON key hit region only after the worker has reached
-   * that state; a fixed delay races Emscripten pthread startup.
+   * Button 101 is ON in all six bundled HP ARM KML layouts. Use the semantic
+   * ID path here so the runtime matrix validates the same API as the SVG UI.
    */
-  moduleInstance._webemu48_button_down(model.power.x, model.power.y);
+  if (!moduleInstance._webemu48_button_id_down(101)) {
+    throw new Error("KML Button 101 (ON) is unavailable");
+  }
   await sleep(300);
-  moduleInstance._webemu48_button_up(model.power.x, model.power.y);
+  if (!moduleInstance._webemu48_button_id_up(101)) {
+    throw new Error("KML Button 101 (ON) could not be released");
+  }
 
   const deadline = performance.now() + 15000;
   let lastState = moduleInstance._webemu48_state();
