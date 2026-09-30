@@ -213,6 +213,8 @@ async function startCalculator() {
   if (!initialized) {
     writeLog("webemu48_init() failed.");
     startButton.disabled = false;
+    modelSelect.disabled = false;
+    romInput.disabled = false;
     return;
   }
 
