@@ -19,11 +19,8 @@
 #endif
 
 extern void win32Init(void);
-extern void draw(void);
 extern BOOL buttonDown(int x, int y);
 extern void buttonUp(int x, int y);
-extern void keyDown(int virtKey);
-extern void keyUp(int virtKey);
 extern BOOL WebButtonById(UINT nId, BOOL bPressed);
 
 extern CRITICAL_SECTION csGDILock;
@@ -187,18 +184,6 @@ int webemu48_new_document(const char *kmlFilename, const char *baseDirectory)
     }
 
     return result;
-}
-
-WEBEMU48_EXPORT
-void webemu48_key_down(int virtKey)
-{
-    keyDown(virtKey);
-}
-
-WEBEMU48_EXPORT
-void webemu48_key_up(int virtKey)
-{
-    keyUp(virtKey);
 }
 
 WEBEMU48_EXPORT

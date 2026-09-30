@@ -102,76 +102,6 @@ VOID CopyItemsToClipboard(HWND hWnd)		// save selected Listbox Items to Clipboar
 	return;
 }
 
-static void MakeBitmapTransparent(HBITMAP hBmp, COLORREF color, DWORD dwTol)
-{
-	(void) hBmp;
-	(void) color;
-	(void) dwTol;
-}
-
-
-//
-// WM_PAINT
-//
-static LRESULT OnPaint(HWND hWindow)
-{
-	PAINTSTRUCT Paint;
-	HDC hPaintDC;
-
-	PAINT_LOGD("PAINT OnPaint()");
-
-	//UpdateWindowBars();						// update visibility of title and menu bar
-
-	hPaintDC = BeginPaint(hWindow, &Paint);
-	if (hMainDC != NULL)
-	{
-		RECT rcMainPaint = Paint.rcPaint;
-		rcMainPaint.left   += nBackgroundX;	// coordinates in source bitmap
-		rcMainPaint.top    += nBackgroundY;
-		rcMainPaint.right  += nBackgroundX;
-		rcMainPaint.bottom += nBackgroundY;
-
-		EnterCriticalSection(&csGDILock);	// solving NT GDI problems
-		{
-			UINT nLines = MAINSCREENHEIGHT;
-
-			// redraw background bitmap
-			PAINT_LOGD("PAINT OnPaint() BitBlt()");
-			BitBlt(hPaintDC, Paint.rcPaint.left, Paint.rcPaint.top,
-				   Paint.rcPaint.right-Paint.rcPaint.left, Paint.rcPaint.bottom-Paint.rcPaint.top,
-				   hMainDC, rcMainPaint.left, rcMainPaint.top, SRCCOPY);
-
-			if (dwTColor != (DWORD) -1) // prepare background bitmap with transparency
-				MakeBitmapTransparent((HBITMAP)GetCurrentObject(hPaintDC, OBJ_BITMAP), dwTColor, dwTColorTol);
-
-			// CdB for HP: add apples display stuff
-			SetWindowOrgEx(hPaintDC, nBackgroundX, nBackgroundY, NULL);
-
-			// redraw header display area
-			StretchBlt(hPaintDC, nLcdX, nLcdY,
-					   131*nLcdZoom*nGdiXZoom, Chipset.d0size*nLcdZoom*nGdiYZoom,
-					   hLcdDC, Chipset.d0offset, 0,
-					   131, Chipset.d0size, SRCCOPY);
-			// redraw main display area
-			StretchBlt(hPaintDC, nLcdX, nLcdY+Chipset.d0size*nLcdZoom*nGdiYZoom,
-					   131*nLcdZoom*nGdiXZoom, nLines*nLcdZoom*nGdiYZoom,
-					   hLcdDC, Chipset.boffset, Chipset.d0size,
-					   131, nLines, SRCCOPY);
-			// redraw menu display area
-			StretchBlt(hPaintDC, nLcdX, nLcdY+(nLines+Chipset.d0size)*nLcdZoom*nGdiYZoom,
-					   131*nLcdZoom*nGdiXZoom, MENUHEIGHT*nLcdZoom*nGdiYZoom,
-					   hLcdDC, 0, (nLines+Chipset.d0size),
-					   131, MENUHEIGHT, SRCCOPY);
-			GdiFlush();
-		}
-		LeaveCriticalSection(&csGDILock);
-		UpdateAnnunciators(0x3F);
-		RefreshButtons(&rcMainPaint);
-	}
-	EndPaint(hWindow, &Paint);
-	return 0;
-}
-
 static LRESULT OnLButtonDown(UINT nFlags, WORD x, WORD y)
 {
 	if (nMacroState == MACRO_PLAY) return 0; // playing macro
@@ -192,38 +122,10 @@ static LRESULT OnLButtonUp(UINT nFlags, WORD x, WORD y)
 	return 0;
 }
 
-static LRESULT OnKeyDown(int nVirtKey, LPARAM lKeyData)
-{
-	if (nMacroState == MACRO_PLAY) return 0; // playing macro
-	// call RunKey() only once (suppress autorepeat feature)
-	if (nState == SM_RUN && (lKeyData & 0x40000000) == 0)
-		RunKey((BYTE)nVirtKey, TRUE);
-	return 0;
-}
-
-static LRESULT OnKeyUp(int nVirtKey, LPARAM lKeyData)
-{
-	if (nMacroState == MACRO_PLAY) return 0; // playing macro
-	if (nState == SM_RUN) RunKey((BYTE)nVirtKey, FALSE);
-	return 0;
-	UNREFERENCED_PARAMETER(lKeyData);
-}
-
-void draw() {
-    OnPaint(NULL);
-}
-
 BOOL buttonDown(int x, int y) {
     return OnLButtonDown(MK_LBUTTON, x, y);
 }
 
 void buttonUp(int x, int y) {
     OnLButtonUp(MK_LBUTTON, x, y);
-}
-
-void keyDown(int virtKey) {
-    OnKeyDown(virtKey, 0);
-}
-void keyUp(int virtKey) {
-    OnKeyUp(virtKey, 0);
 }
