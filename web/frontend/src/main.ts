@@ -30,8 +30,6 @@ type EmuModule = {
   _webemu48_button_up(x: number, y: number): void;
   _webemu48_button_id_down(id: number): number;
   _webemu48_button_id_up(id: number): number;
-  _webemu48_key_down(virtKey: number): void;
-  _webemu48_key_up(virtKey: number): void;
   _webemu48_lcd_refresh(): number;
   _webemu48_lcd_width(): number;
   _webemu48_lcd_height(): number;
@@ -185,7 +183,7 @@ let frameImageData: ImageData | null = null;
 let activePointerVisualKey: Element | null = null;
 let skinLoadGeneration = 0;
 const skinCache = new Map<string, string>();
-const activeVirtualKeys = new Set<number>();
+const activeKeyboardButtonIds = new Set<number>();
 const activeKeyboardVisuals = new Map<number, Element>();
 
 function selectedModel(): ModelConfig {
@@ -437,64 +435,51 @@ function releasePointer(event: PointerEvent): void {
   event.preventDefault();
 }
 
-function virtualKeyForEvent(event: KeyboardEvent): number | null {
-  if (/^F[1-6]$/.test(event.key)) return 111 + Number(event.key.slice(1));
-  if (/^[0-9]$/.test(event.key)) return event.key.charCodeAt(0);
-
-  switch (event.key) {
-    case "+": return 187;
-    case "-": return 189;
-    case "*": return 106;
-    case "/": return 191;
-    case ".": return 190;
-    case ",": return 188;
-    case "Enter": return 13;
-    case "Backspace": return 8;
-    case "Escape": return 27;
-    case "ArrowLeft": return 37;
-    case "ArrowUp": return 38;
-    case "ArrowRight": return 39;
-    case "ArrowDown": return 40;
-    default: return null;
-  }
-}
 
 function keyDown(event: KeyboardEvent): void {
   if (!running || !moduleInstance || event.repeat) return;
-  const virtKey = virtualKeyForEvent(event);
-  if (virtKey === null || activeVirtualKeys.has(virtKey)) return;
 
-  activeVirtualKeys.add(virtKey);
-  const visualKey = visualKeyForEvent(event);
+  const svgId = visualKeyIdForEvent(event);
+  if (!svgId) return;
+  const buttonId = SVG_KEY_TO_KML_BUTTON_ID[svgId];
+  if (buttonId === undefined || activeKeyboardButtonIds.has(buttonId)) return;
+
+  if (!moduleInstance._webemu48_button_id_down(buttonId)) return;
+
+  activeKeyboardButtonIds.add(buttonId);
+  const visualKey = skin.querySelector(`#${svgId}`);
   if (visualKey) {
     visualKey.classList.add("is-keyboard-pressed");
-    activeKeyboardVisuals.set(virtKey, visualKey);
+    activeKeyboardVisuals.set(buttonId, visualKey);
   }
 
-  moduleInstance._webemu48_key_down(virtKey);
   event.preventDefault();
 }
 
 function keyUp(event: KeyboardEvent): void {
   if (!running || !moduleInstance) return;
-  const virtKey = virtualKeyForEvent(event);
-  if (virtKey === null || !activeVirtualKeys.has(virtKey)) return;
 
-  moduleInstance._webemu48_key_up(virtKey);
-  activeKeyboardVisuals.get(virtKey)?.classList.remove("is-keyboard-pressed");
-  activeKeyboardVisuals.delete(virtKey);
-  activeVirtualKeys.delete(virtKey);
+  const svgId = visualKeyIdForEvent(event);
+  if (!svgId) return;
+  const buttonId = SVG_KEY_TO_KML_BUTTON_ID[svgId];
+  if (buttonId === undefined || !activeKeyboardButtonIds.has(buttonId)) return;
+
+  moduleInstance._webemu48_button_id_up(buttonId);
+  activeKeyboardVisuals.get(buttonId)?.classList.remove("is-keyboard-pressed");
+  activeKeyboardVisuals.delete(buttonId);
+  activeKeyboardButtonIds.delete(buttonId);
   event.preventDefault();
 }
 
 function releaseKeyboard(): void {
   if (!moduleInstance) return;
-  for (const virtKey of activeVirtualKeys) {
-    moduleInstance._webemu48_key_up(virtKey);
-    activeKeyboardVisuals.get(virtKey)?.classList.remove("is-keyboard-pressed");
+
+  for (const buttonId of activeKeyboardButtonIds) {
+    moduleInstance._webemu48_button_id_up(buttonId);
+    activeKeyboardVisuals.get(buttonId)?.classList.remove("is-keyboard-pressed");
   }
   activeKeyboardVisuals.clear();
-  activeVirtualKeys.clear();
+  activeKeyboardButtonIds.clear();
 }
 
 async function startCalculator(): Promise<void> {

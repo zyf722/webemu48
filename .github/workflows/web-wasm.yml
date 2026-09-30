@@ -228,6 +228,13 @@ jobs:
               "#skin #keyboard > g[id^='key-']"
             ].join(", ");
             const sampleKey = document.querySelector("#skin #keyboard > g[id^='key-']");
+            const interactiveKeys = Array.from(document.querySelectorAll(keySelector));
+            const mappedKeyCount = interactiveKeys.filter(
+              key => key.hasAttribute("data-kml-button-id")
+            ).length;
+            sampleKey?.classList.add("is-pointer-pressed");
+            const pressedTransform = sampleKey ? getComputedStyle(sampleKey).transform : "";
+            sampleKey?.classList.remove("is-pointer-pressed");
             const canvas = document.querySelector("#lcd");
             const context = canvas?.getContext("2d");
             const lcdPixel = context ? Array.from(context.getImageData(0, 0, 1, 1).data) : [];
@@ -240,8 +247,11 @@ jobs:
               startText: document.querySelector("#start")?.textContent || "",
               skin: document.querySelector("#skin")?.dataset.skin || "",
               skinViewBox: document.querySelector("#skin svg")?.getAttribute("viewBox") || "",
-              interactiveKeyCount: document.querySelectorAll(keySelector).length,
+              interactiveKeyCount: interactiveKeys.length,
+              mappedKeyCount,
+              onButtonId: document.querySelector("#skin #key-on")?.getAttribute("data-kml-button-id") || "",
               sampleCursor: sampleKey ? getComputedStyle(sampleKey).cursor : "",
+              pressedTransform,
               lcdWidth: canvas?.width || 0,
               lcdHeight: canvas?.height || 0,
               lcdPixel,
@@ -259,7 +269,10 @@ jobs:
           if (snapshot.skin !== "hp50g.svg") throw new Error("Model switch did not install HP 50g SVG skin: " + snapshot.skin);
           if (snapshot.skinViewBox !== "0 0 665 1340") throw new Error("Unexpected SVG viewBox: " + snapshot.skinViewBox);
           if (snapshot.interactiveKeyCount < 50) throw new Error("Too few interactive SVG keys: " + snapshot.interactiveKeyCount);
+          if (snapshot.mappedKeyCount !== snapshot.interactiveKeyCount) throw new Error("Not all SVG keys have KML Button IDs: " + snapshot.mappedKeyCount + "/" + snapshot.interactiveKeyCount);
+          if (snapshot.onButtonId !== "101") throw new Error("ON key did not map to KML Button 101: " + snapshot.onButtonId);
           if (snapshot.sampleCursor !== "pointer") throw new Error("Calculator keys do not expose pointer cursor: " + snapshot.sampleCursor);
+          if (!snapshot.pressedTransform || snapshot.pressedTransform === "none") throw new Error("Pressed key has no visible transform");
           if (snapshot.lcdWidth !== 131 || snapshot.lcdHeight !== 80) throw new Error("Unexpected blank LCD size: " + snapshot.lcdWidth + "x" + snapshot.lcdHeight);
           if (snapshot.lcdPixel.join(",") !== "168,192,176,255") throw new Error("Unexpected blank LCD color: " + snapshot.lcdPixel.join(","));
           if (snapshot.aspectRatio !== "665 / 1340") throw new Error("Unexpected calculator aspect ratio: " + snapshot.aspectRatio);
