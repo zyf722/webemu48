@@ -28,6 +28,27 @@ async function waitForState(moduleInstance, expectedState, timeoutMs = 5000) {
   );
 }
 
+async function waitForShutdown(moduleInstance, timeoutMs = 5000) {
+  const deadline = performance.now() + timeoutMs;
+
+  while (performance.now() < deadline) {
+    if (
+      moduleInstance._webemu48_state() === 0 &&
+      moduleInstance._webemu48_cpu_shutdn() === 1
+    ) {
+      return;
+    }
+    await sleep(10);
+  }
+
+  throw new Error(
+    `Timed out waiting for reset SHUTDN; state=${moduleInstance._webemu48_state()}, ` +
+    `next=${moduleInstance._webemu48_next_state()}, ` +
+    `shutdn=${moduleInstance._webemu48_cpu_shutdn()}, ` +
+    `pc=${moduleInstance._webemu48_pc() >>> 0}`
+  );
+}
+
 function hasPixelVariation(heap, pointer, width, height) {
   const length = width * height * 4;
   if (!pointer || length <= 4) return false;
@@ -90,12 +111,13 @@ try {
   if (!opened) throw new Error("webemu48_new_document() returned false");
 
   await waitForState(moduleInstance, 0);
+  await waitForShutdown(moduleInstance);
 
   /*
-   * A freshly-created calculator can begin with the LCD powered off.
-   * Exercise the real KML ON key hit region rather than forcing emulator state.
+   * A freshly reset calculator waits in SHUTDN for the physical ON key.
+   * Exercise the real KML ON key hit region only after the worker has reached
+   * that state; a fixed delay races Emscripten pthread startup.
    */
-  await sleep(250);
   const cyclesBeforeOn = moduleInstance._webemu48_cycles_low() >>> 0;
   const pcBeforeOn = moduleInstance._webemu48_pc() >>> 0;
   moduleInstance._webemu48_button_down(46, 837);
