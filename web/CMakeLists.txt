@@ -5,21 +5,38 @@ project(webemu48_portability_probe LANGUAGES C)
 set(EMU48_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/../app/src/main/cpp")
 set(EMU48_CORE_DIR "${EMU48_CPP_DIR}/core")
 
+# Compile the same Emu48 core translation units used by the Android build.
+# Platform implementations (win32-layer.c, android-layer.c, android-emu.c and
+# emu-jni.c) are intentionally excluded from this target.
 add_library(webemu48_core_probe OBJECT
-    "${EMU48_CORE_DIR}/pch.c"
     "${EMU48_CORE_DIR}/apple.c"
     "${EMU48_CORE_DIR}/ddeserv.c"
     "${EMU48_CORE_DIR}/disasm.c"
     "${EMU48_CORE_DIR}/dismem.c"
+    "${EMU48_CPP_DIR}/patch/display_ex.c"
     "${EMU48_CORE_DIR}/disrpl.c"
     "${EMU48_CORE_DIR}/engine.c"
     "${EMU48_CORE_DIR}/fetch.c"
+    "${EMU48_CORE_DIR}/files.c"
     "${EMU48_CORE_DIR}/i28f160.c"
     "${EMU48_CORE_DIR}/keyboard.c"
+    "${EMU48_CORE_DIR}/keymacro.c"
+    "${EMU48_CORE_DIR}/kml.c"
+    "${EMU48_CORE_DIR}/lodepng.c"
+    "${EMU48_CORE_DIR}/lowbat.c"
     "${EMU48_CORE_DIR}/mops.c"
+    "${EMU48_CORE_DIR}/mru.c"
     "${EMU48_CORE_DIR}/opcodes.c"
+    "${EMU48_CORE_DIR}/pch.c"
+    "${EMU48_CORE_DIR}/redeye.c"
+    "${EMU48_CORE_DIR}/romcrc.c"
     "${EMU48_CORE_DIR}/rpl.c"
+    "${EMU48_CORE_DIR}/serial.c"
+    "${EMU48_CORE_DIR}/settings.c"
+    "${EMU48_CORE_DIR}/sound.c"
     "${EMU48_CORE_DIR}/stack.c"
+    "${EMU48_CORE_DIR}/symbfile.c"
+    "${EMU48_CORE_DIR}/timer.c"
     src/portability_probe.c
 )
 
