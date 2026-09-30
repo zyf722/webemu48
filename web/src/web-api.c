@@ -346,3 +346,73 @@ int webemu48_lcd_height(void)
         return 0;
     return abs(hLcdDC->selectedBitmap->bitmapInfoHeader->biHeight);
 }
+
+WEBEMU48_EXPORT
+int webemu48_display_on(void)
+{
+    return (Chipset.IORam[BITOFFSET] & DON) != 0;
+}
+
+WEBEMU48_EXPORT
+int webemu48_cpu_shutdn(void)
+{
+    return Chipset.Shutdn != 0;
+}
+
+WEBEMU48_EXPORT
+unsigned int webemu48_pc(void)
+{
+    return (unsigned int) Chipset.pc;
+}
+
+WEBEMU48_EXPORT
+unsigned int webemu48_ir15x(void)
+{
+    return (unsigned int) Chipset.IR15X;
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_raw_min(void)
+{
+    if (!hLcdDC || !hLcdDC->selectedBitmap ||
+        !hLcdDC->selectedBitmap->bitmapInfoHeader ||
+        !hLcdDC->selectedBitmap->bitmapBits)
+        return -1;
+
+    const BITMAPINFOHEADER *header = hLcdDC->selectedBitmap->bitmapInfoHeader;
+    const int width = header->biWidth;
+    const int height = abs(header->biHeight);
+    const int stride = 4 * ((width * header->biBitCount + 31) / 32);
+    const BYTE *bits = (const BYTE *) hLcdDC->selectedBitmap->bitmapBits;
+    int minimum = 255;
+
+    for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x)
+            if (bits[y * stride + x] < minimum)
+                minimum = bits[y * stride + x];
+
+    return minimum;
+}
+
+WEBEMU48_EXPORT
+int webemu48_lcd_raw_max(void)
+{
+    if (!hLcdDC || !hLcdDC->selectedBitmap ||
+        !hLcdDC->selectedBitmap->bitmapInfoHeader ||
+        !hLcdDC->selectedBitmap->bitmapBits)
+        return -1;
+
+    const BITMAPINFOHEADER *header = hLcdDC->selectedBitmap->bitmapInfoHeader;
+    const int width = header->biWidth;
+    const int height = abs(header->biHeight);
+    const int stride = 4 * ((width * header->biBitCount + 31) / 32);
+    const BYTE *bits = (const BYTE *) hLcdDC->selectedBitmap->bitmapBits;
+    int maximum = 0;
+
+    for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x)
+            if (bits[y * stride + x] > maximum)
+                maximum = bits[y * stride + x];
+
+    return maximum;
+}
