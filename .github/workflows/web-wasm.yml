@@ -45,7 +45,10 @@ jobs:
           test -f dist/webemu48.data
           cp web/demo/index.html dist/
           cp web/demo/demo.js dist/
+          cp web/demo/bootstrap.js dist/
+          cp web/demo/coi-serviceworker.js dist/
           cp web/demo/serve.py dist/
+          cp app/src/main/assets/calculators/real39gp-lc.png dist/
 
       - name: Upload browser demo
         uses: actions/upload-artifact@v4
@@ -53,7 +56,6 @@ jobs:
           name: webemu48-browser-demo
           path: dist/
           if-no-files-found: error
-
 
   browser-runtime-smoke:
     needs: portability-probe
@@ -94,6 +96,14 @@ jobs:
             echo "No Chromium/Chrome binary found on runner"
             exit 1
           fi
-          "$CHROME"             --headless=new             --no-sandbox             --disable-gpu             --disable-dev-shm-usage             --virtual-time-budget=20000             --dump-dom             http://127.0.0.1:8000/smoke.html             > /tmp/webemu48-smoke-dom.html
+          "$CHROME" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-dev-shm-usage \
+            --virtual-time-budget=20000 \
+            --dump-dom \
+            http://127.0.0.1:8000/smoke.html \
+            > /tmp/webemu48-smoke-dom.html
           cat /tmp/webemu48-smoke-dom.html
           grep -q 'data-smoke="pass"' /tmp/webemu48-smoke-dom.html

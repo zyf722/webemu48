@@ -3,31 +3,105 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>webemu48 · 39g+ bring-up</title>
+  <title>webemu48 · HP 39g+ preview</title>
   <style>
-    :root { font-family: ui-sans-serif, system-ui, sans-serif; color-scheme: light dark; }
-    body { max-width: 880px; margin: 40px auto; padding: 0 20px; }
+    :root {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: light dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      max-width: 980px;
+      margin: 32px auto;
+      padding: 0 20px 40px;
+      line-height: 1.5;
+    }
+    h1 { margin-bottom: 8px; }
+    .muted { opacity: .72; }
     .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    canvas { margin-top: 24px; width: 524px; height: 256px; image-rendering: pixelated;
-      border: 1px solid #888; background: #a8c0b0; }
-    pre { white-space: pre-wrap; background: color-mix(in srgb, CanvasText 8%, Canvas);
-      padding: 12px; border-radius: 8px; min-height: 80px; }
     button, input { font: inherit; }
+    button { padding: 8px 14px; cursor: pointer; }
+    button:disabled { cursor: default; opacity: .55; }
+
+    .calculator-wrap {
+      margin-top: 24px;
+      display: flex;
+      justify-content: center;
+    }
+    #calculator {
+      position: relative;
+      width: min(444px, 100%);
+      aspect-ratio: 444 / 884;
+      user-select: none;
+      touch-action: none;
+    }
+    #skin {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+    }
+    #lcd {
+      position: absolute;
+      left: calc(25 / 444 * 100%);
+      top: calc(21 / 884 * 100%);
+      width: calc(393 / 444 * 100%);
+      height: calc(192 / 884 * 100%);
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      pointer-events: none;
+      background: rgb(168 192 176);
+    }
+
+    pre {
+      white-space: pre-wrap;
+      background: color-mix(in srgb, CanvasText 8%, Canvas);
+      padding: 12px;
+      border-radius: 8px;
+      min-height: 72px;
+      overflow-wrap: anywhere;
+    }
+    .notice {
+      padding: 10px 12px;
+      border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+      border-radius: 8px;
+      margin: 16px 0;
+    }
   </style>
 </head>
 <body>
-  <h1>webemu48 · HP 39g+ bring-up</h1>
-  <p>
-    This page does not bundle a calculator ROM. Select a compatible 39g/39g+/39gs/40gs
-    ROM image from your computer; it is copied only into the in-memory Emscripten filesystem.
+  <h1>webemu48 · HP 39g+ preview</h1>
+  <p class="muted">
+    Experimental WebAssembly port of the Emu48 Android fork.
   </p>
+
+  <div id="bootstrap-status" class="notice">Preparing cross-origin-isolated runtime…</div>
+
+  <p>
+    This page does <strong>not</strong> include a calculator ROM. Select your own compatible
+    HP 39g / 39g+ / 39gs / 40gs ROM image; it stays in the browser's in-memory filesystem.
+  </p>
+
   <div class="row">
     <input id="rom" type="file" />
     <button id="start" disabled>Start 39g+</button>
   </div>
-  <canvas id="lcd" width="131" height="64"></canvas>
-  <pre id="log">Loading WebAssembly module…</pre>
 
-  <script type="module" src="./demo.js"></script>
+  <div class="calculator-wrap">
+    <div id="calculator" aria-label="Clickable HP 39g+ emulator">
+      <img id="skin" src="./real39gp-lc.png" alt="HP 39g+ emulator skin" draggable="false" />
+      <canvas id="lcd" width="131" height="64"></canvas>
+    </div>
+  </div>
+
+  <p class="muted">
+    Temporary skin from the upstream Emu48 Android assets (Eric Rechlin).
+    The final UI will be replaced by the project's own calculator SVG.
+  </p>
+
+  <pre id="log">Waiting for isolated browser context…</pre>
+
+  <script type="module" src="./bootstrap.js"></script>
 </body>
 </html>

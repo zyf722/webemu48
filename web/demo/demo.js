@@ -2,12 +2,16 @@ import createWebEmu48 from "./webemu48.js";
 
 const romInput = document.querySelector("#rom");
 const startButton = document.querySelector("#start");
+const calculator = document.querySelector("#calculator");
 const canvas = document.querySelector("#lcd");
 const ctx = canvas.getContext("2d", { alpha: false });
 const log = document.querySelector("#log");
+const bootstrapStatus = document.querySelector("#bootstrap-status");
 
 let moduleInstance = null;
 let running = false;
+let activePointerId = null;
+let lastPointer = { x: 0, y: 0 };
 
 function writeLog(message) {
   log.textContent += "\n" + message;
@@ -19,6 +23,39 @@ function ensureDirectory(FS, path) {
   } catch (error) {
     if (!String(error).includes("File exists")) throw error;
   }
+}
+
+function toKmlCoordinates(event) {
+  const rect = calculator.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(443, Math.floor((event.clientX - rect.left) * 444 / rect.width))),
+    y: Math.max(0, Math.min(883, Math.floor((event.clientY - rect.top) * 884 / rect.height)))
+  };
+}
+
+function pointerDown(event) {
+  if (!running || activePointerId !== null) return;
+
+  const point = toKmlCoordinates(event);
+  activePointerId = event.pointerId;
+  lastPointer = point;
+  calculator.setPointerCapture?.(event.pointerId);
+  moduleInstance._webemu48_button_down(point.x, point.y);
+  event.preventDefault();
+}
+
+function pointerMove(event) {
+  if (event.pointerId !== activePointerId) return;
+  lastPointer = toKmlCoordinates(event);
+}
+
+function pointerUp(event) {
+  if (!running || event.pointerId !== activePointerId) return;
+
+  const point = toKmlCoordinates(event);
+  moduleInstance._webemu48_button_up(point.x, point.y);
+  activePointerId = null;
+  event.preventDefault();
 }
 
 async function bootModule() {
@@ -33,6 +70,8 @@ async function bootModule() {
       writeLog(String(text));
     }
   });
+
+  bootstrapStatus.textContent = "Runtime ready.";
   log.textContent = "WebAssembly module loaded. Select a ROM image.";
   startButton.disabled = false;
 }
@@ -56,29 +95,31 @@ async function startCalculator() {
 
   writeLog(`ROM loaded into memory: ${bytes.byteLength} bytes`);
 
-  if (!moduleInstance.ccall(
+  const initialized = moduleInstance.ccall(
     "webemu48_init",
     "number",
     ["string"],
     ["/calculators/"]
-  )) {
+  );
+  if (!initialized) {
     writeLog("webemu48_init() failed.");
     startButton.disabled = false;
     return;
   }
 
-  if (!moduleInstance.ccall(
+  const opened = moduleInstance.ccall(
     "webemu48_new_document",
     "number",
     ["string", "string"],
     ["real39gp-lc.kml", "/calculators/"]
-  )) {
+  );
+  if (!opened) {
     writeLog("NewDocument() failed. Check the selected ROM.");
     startButton.disabled = false;
     return;
   }
 
-  writeLog("Emulator started.");
+  writeLog("Emulator started. The calculator image is now clickable.");
   running = true;
   requestAnimationFrame(renderLoop);
 }
@@ -96,6 +137,7 @@ function renderLoop() {
         canvas.width = width;
         canvas.height = height;
       }
+
       const byteLength = width * height * 4;
       const pixels = new Uint8ClampedArray(
         moduleInstance.HEAPU8.buffer,
@@ -109,8 +151,20 @@ function renderLoop() {
   requestAnimationFrame(renderLoop);
 }
 
+calculator.addEventListener("pointerdown", pointerDown);
+calculator.addEventListener("pointermove", pointerMove);
+calculator.addEventListener("pointerup", pointerUp);
+calculator.addEventListener("pointercancel", pointerUp);
+calculator.addEventListener("lostpointercapture", event => {
+  if (event.pointerId === activePointerId && running) {
+    moduleInstance._webemu48_button_up(lastPointer.x, lastPointer.y);
+    activePointerId = null;
+  }
+});
+
 startButton.addEventListener("click", startCalculator);
 
 bootModule().catch(error => {
+  bootstrapStatus.textContent = "Runtime failed to load.";
   log.textContent = "Failed to load WebAssembly module:\n" + (error?.stack || error);
 });
