@@ -72,6 +72,167 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  browser-demo-ui:
+    needs: portability-probe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download browser demo
+        uses: actions/download-artifact@v4
+        with:
+          name: webemu48-browser-demo
+          path: dist
+
+      - name: Start cross-origin-isolated server
+        run: |
+          cd dist
+          nohup python3 serve.py > /tmp/webemu48-ui-server.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8000/index.html >/dev/null; then
+              exit 0
+            fi
+            sleep 0.25
+          done
+          cat /tmp/webemu48-ui-server.log
+          exit 1
+
+      - name: Run Chromium demo UI smoke
+        run: |
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo "No Chromium/Chrome binary found on runner"
+            exit 1
+          fi
+
+          "$CHROME" \
+            --headless=new \
+            --no-sandbox \
+            --disable-gpu \
+            --disable-dev-shm-usage \
+            --remote-debugging-port=9222 \
+            --user-data-dir=/tmp/webemu48-ui-chrome \
+            about:blank \
+            > /tmp/webemu48-ui-chrome.log 2>&1 &
+          CHROME_PID=$!
+          trap 'kill "$CHROME_PID" 2>/dev/null || true' EXIT
+
+          for i in {1..80}; do
+            if curl -fsS http://127.0.0.1:9222/json/version >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:9222/json/version >/dev/null
+
+          node <<'NODE'
+          const targetUrl = "http://127.0.0.1:8000/index.html";
+          const targetResponse = await fetch(
+            "http://127.0.0.1:9222/json/new?" + encodeURIComponent(targetUrl),
+            { method: "PUT" }
+          );
+          if (!targetResponse.ok) {
+            throw new Error("Could not create Chromium target: " + targetResponse.status);
+          }
+
+          const target = await targetResponse.json();
+          const socket = new WebSocket(target.webSocketDebuggerUrl);
+          await new Promise((resolve, reject) => {
+            socket.addEventListener("open", resolve, { once: true });
+            socket.addEventListener("error", reject, { once: true });
+          });
+
+          let nextId = 1;
+          const pending = new Map();
+          socket.addEventListener("message", event => {
+            const message = JSON.parse(event.data);
+            if (!message.id) return;
+            const waiter = pending.get(message.id);
+            if (!waiter) return;
+            pending.delete(message.id);
+            if (message.error) waiter.reject(new Error(JSON.stringify(message.error)));
+            else waiter.resolve(message.result);
+          });
+
+          function cdp(method, params = {}) {
+            const id = nextId++;
+            return new Promise((resolve, reject) => {
+              pending.set(id, { resolve, reject });
+              socket.send(JSON.stringify({ id, method, params }));
+            });
+          }
+
+          async function evaluate(expression) {
+            const result = await cdp("Runtime.evaluate", {
+              expression,
+              returnByValue: true
+            });
+            if (result?.exceptionDetails) {
+              throw new Error(JSON.stringify(result.exceptionDetails));
+            }
+            return result?.result?.value;
+          }
+
+          await cdp("Runtime.enable");
+
+          const deadline = Date.now() + 30000;
+          let status = "";
+          while (Date.now() < deadline) {
+            status = await evaluate(
+              'document.querySelector("#bootstrap-status")?.textContent || ""'
+            );
+            if (status === "Runtime ready.") break;
+            if (status.includes("failed")) {
+              throw new Error("Demo bootstrap failed: " + status);
+            }
+            await new Promise(resolve => setTimeout(resolve, 250));
+          }
+          if (status !== "Runtime ready.") {
+            throw new Error("Timed out waiting for demo runtime: " + status);
+          }
+
+          await evaluate(`(() => {
+            const select = document.querySelector("#model");
+            select.value = "50g";
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            return true;
+          })()`);
+
+          const snapshot = JSON.parse(await evaluate(`JSON.stringify({
+            isolated: crossOriginIsolated,
+            status: document.querySelector("#bootstrap-status")?.textContent || "",
+            models: Array.from(document.querySelectorAll("#model option")).map(option => option.value),
+            startDisabled: document.querySelector("#start")?.disabled,
+            startText: document.querySelector("#start")?.textContent || "",
+            skin: document.querySelector("#skin")?.getAttribute("src") || "",
+            aspectRatio: document.querySelector("#calculator")?.style.aspectRatio || "",
+            tabIndex: document.querySelector("#calculator")?.tabIndex
+          })`));
+
+          const expectedModels = ["39gp", "39gs", "40gs", "48gii", "49gp", "50g"];
+          if (!snapshot.isolated) throw new Error("Demo is not cross-origin isolated");
+          if (snapshot.status !== "Runtime ready.") {
+            throw new Error("Unexpected bootstrap status: " + snapshot.status);
+          }
+          if (snapshot.models.join(",") !== expectedModels.join(",")) {
+            throw new Error("Unexpected model list: " + snapshot.models.join(","));
+          }
+          if (snapshot.startDisabled) throw new Error("Start button stayed disabled");
+          if (snapshot.startText !== "Start 50g") {
+            throw new Error("50g model switch did not update Start button: " + snapshot.startText);
+          }
+          if (!snapshot.skin.endsWith("real50g-lc.png")) {
+            throw new Error("50g model switch did not update skin: " + snapshot.skin);
+          }
+          if (snapshot.aspectRatio !== "437 / 940") {
+            throw new Error("50g model switch did not update aspect ratio: " + snapshot.aspectRatio);
+          }
+          if (snapshot.tabIndex !== 0) {
+            throw new Error("Calculator surface is not keyboard-focusable");
+          }
+
+          console.log("PASS demo UI", snapshot);
+          socket.close();
+          NODE
+
   browser-runtime-smoke:
     needs: portability-probe
     runs-on: ubuntu-latest
