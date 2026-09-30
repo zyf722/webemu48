@@ -210,26 +210,45 @@ jobs:
             return true;
           })()`);
 
-          for (let i = 0; i < 20; i++) {
+          for (let i = 0; i < 40; i++) {
             const loaded = await evaluate(
-              'document.querySelector("#skin")?.complete && document.querySelector("#skin")?.naturalWidth > 0'
+              'document.querySelector("#skin")?.dataset.skin === "hp50g.svg" && !!document.querySelector("#skin svg")'
             );
             if (loaded) break;
             await new Promise(resolve => setTimeout(resolve, 100));
           }
 
-          const snapshot = JSON.parse(await evaluate(`JSON.stringify({
-            isolated: crossOriginIsolated,
-            status: document.querySelector("#bootstrap-status")?.textContent || "",
-            models: Array.from(document.querySelectorAll("#model option")).map(option => option.value),
-            startDisabled: document.querySelector("#start")?.disabled,
-            startText: document.querySelector("#start")?.textContent || "",
-            skin: document.querySelector("#skin")?.src || "",
-            skinWidth: document.querySelector("#skin")?.naturalWidth || 0,
-            skinHeight: document.querySelector("#skin")?.naturalHeight || 0,
-            aspectRatio: document.querySelector("#calculator")?.style.aspectRatio || "",
-            tabIndex: document.querySelector("#calculator")?.tabIndex
-          })`));
+          const snapshot = JSON.parse(await evaluate(`(() => {
+            const keySelector = [
+              "#skin #six-function-keys > g[id^='F']",
+              "#skin #navigation > #up",
+              "#skin #navigation > #left",
+              "#skin #navigation > #right",
+              "#skin #navigation > #down",
+              "#skin #keyboard > g[id^='key-']"
+            ].join(", ");
+            const sampleKey = document.querySelector("#skin #keyboard > g[id^='key-']");
+            const canvas = document.querySelector("#lcd");
+            const context = canvas?.getContext("2d");
+            const lcdPixel = context ? Array.from(context.getImageData(0, 0, 1, 1).data) : [];
+
+            return JSON.stringify({
+              isolated: crossOriginIsolated,
+              status: document.querySelector("#bootstrap-status")?.textContent || "",
+              models: Array.from(document.querySelectorAll("#model option")).map(option => option.value),
+              startDisabled: document.querySelector("#start")?.disabled,
+              startText: document.querySelector("#start")?.textContent || "",
+              skin: document.querySelector("#skin")?.dataset.skin || "",
+              skinViewBox: document.querySelector("#skin svg")?.getAttribute("viewBox") || "",
+              interactiveKeyCount: document.querySelectorAll(keySelector).length,
+              sampleCursor: sampleKey ? getComputedStyle(sampleKey).cursor : "",
+              lcdWidth: canvas?.width || 0,
+              lcdHeight: canvas?.height || 0,
+              lcdPixel,
+              aspectRatio: document.querySelector("#calculator")?.style.aspectRatio || "",
+              tabIndex: document.querySelector("#calculator")?.tabIndex
+            });
+          })()`));
 
           const expectedModels = ["39gp", "39gs", "40gs", "48gii", "49gp", "50g"];
           if (!snapshot.isolated) throw new Error("Frontend is not cross-origin isolated");
@@ -237,8 +256,12 @@ jobs:
           if (snapshot.models.join(",") !== expectedModels.join(",")) throw new Error("Unexpected model list: " + snapshot.models.join(","));
           if (snapshot.startDisabled) throw new Error("Start button stayed disabled");
           if (snapshot.startText !== "Start HP 50g") throw new Error("Model switch did not update Start button: " + snapshot.startText);
-          if (!snapshot.skin.endsWith("/skins/hp50g.svg")) throw new Error("Model switch did not update SVG skin: " + snapshot.skin);
-          if (snapshot.skinWidth !== 665 || snapshot.skinHeight !== 1340) throw new Error("Unexpected SVG dimensions: " + snapshot.skinWidth + "x" + snapshot.skinHeight);
+          if (snapshot.skin !== "hp50g.svg") throw new Error("Model switch did not install HP 50g SVG skin: " + snapshot.skin);
+          if (snapshot.skinViewBox !== "0 0 665 1340") throw new Error("Unexpected SVG viewBox: " + snapshot.skinViewBox);
+          if (snapshot.interactiveKeyCount < 50) throw new Error("Too few interactive SVG keys: " + snapshot.interactiveKeyCount);
+          if (snapshot.sampleCursor !== "pointer") throw new Error("Calculator keys do not expose pointer cursor: " + snapshot.sampleCursor);
+          if (snapshot.lcdWidth !== 131 || snapshot.lcdHeight !== 80) throw new Error("Unexpected blank LCD size: " + snapshot.lcdWidth + "x" + snapshot.lcdHeight);
+          if (snapshot.lcdPixel.join(",") !== "168,192,176,255") throw new Error("Unexpected blank LCD color: " + snapshot.lcdPixel.join(","));
           if (snapshot.aspectRatio !== "665 / 1340") throw new Error("Unexpected calculator aspect ratio: " + snapshot.aspectRatio);
           if (snapshot.tabIndex !== 0) throw new Error("Calculator surface is not keyboard-focusable");
 
