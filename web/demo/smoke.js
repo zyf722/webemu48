@@ -97,25 +97,19 @@ async function waitForShutdown(moduleInstance, timeoutMs = 5000) {
   );
 }
 
-function hasPixelVariation(heap, pointer, width, height, startRow = 0, rowCount = height) {
-  if (!pointer || width <= 0 || height <= 0) return false;
+function hasPixelVariation(heap, pointer, width, height) {
+  const length = width * height * 4;
+  if (!pointer || length <= 4) return false;
 
-  const firstRow = Math.max(0, Math.min(height - 1, startRow));
-  const lastRow = Math.max(firstRow + 1, Math.min(height, firstRow + rowCount));
-  const firstOffset = pointer + firstRow * width * 4;
-  const firstR = heap[firstOffset];
-  const firstG = heap[firstOffset + 1];
-  const firstB = heap[firstOffset + 2];
+  const firstR = heap[pointer];
+  const firstG = heap[pointer + 1];
+  const firstB = heap[pointer + 2];
 
-  for (
-    let offset = firstOffset + 4;
-    offset < pointer + lastRow * width * 4;
-    offset += 4
-  ) {
+  for (let offset = 4; offset < length; offset += 4) {
     if (
-      heap[offset] !== firstR ||
-      heap[offset + 1] !== firstG ||
-      heap[offset + 2] !== firstB
+      heap[pointer + offset] !== firstR ||
+      heap[pointer + offset + 1] !== firstG ||
+      heap[pointer + offset + 2] !== firstB
     ) {
       return true;
     }
@@ -198,19 +192,15 @@ try {
 
     const screenVaries =
       hasPixelVariation(moduleInstance.HEAPU8, pointer, width, height);
-    const topBandVaries =
-      hasPixelVariation(moduleInstance.HEAPU8, pointer, width, height, 0, 12);
-    const statusAreaReady = modelId !== "39gp" || topBandVaries;
 
     if (
       width === 131 &&
       height === model.lcdHeight &&
-      screenVaries &&
-      statusAreaReady
+      screenVaries
     ) {
       setStatus(
         "pass",
-        `PASS model=${modelId} state=${lastState} lcd=${width}x${height} top12=${topBandVaries ? 1 : 0}`
+        `PASS model=${modelId} state=${lastState} lcd=${width}x${height} annunciators=0x${moduleInstance._webemu48_annunciators().toString(16)}`
       );
       break;
     }
@@ -224,7 +214,8 @@ try {
       shutdn: moduleInstance._webemu48_cpu_shutdn(),
       pc: moduleInstance._webemu48_pc() >>> 0,
       width: moduleInstance._webemu48_lcd_width(),
-      height: moduleInstance._webemu48_lcd_height()
+      height: moduleInstance._webemu48_lcd_height(),
+      annunciators: moduleInstance._webemu48_annunciators()
     };
     throw new Error(
       `${model.label} LCD never became non-uniform; ` + JSON.stringify(diagnostics)

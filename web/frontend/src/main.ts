@@ -12,6 +12,7 @@ type ModelConfig = {
   kmlHeight: number;
   lcdHeight: 64 | 80;
   display: DisplayRect;
+  annunciators?: DisplayRect;
   power: { x: number; y: number };
 };
 type EmuFs = {
@@ -34,6 +35,7 @@ type EmuModule = {
   _webemu48_lcd_width(): number;
   _webemu48_lcd_height(): number;
   _webemu48_lcd_rgba(): number;
+  _webemu48_annunciators(): number;
 };
 type RuntimeFactory = (options: {
   locateFile(path: string): string;
@@ -77,21 +79,24 @@ const MODELS: Record<ModelId, ModelConfig> = {
     label: "HP 39g+", rom: "rom.39g", romSize: 1_048_576,
     kml: "real39gp-lc.kml", skin: "hp39gplus.svg",
     kmlWidth: 444, kmlHeight: 884, lcdHeight: 64,
-    display: { x: 100, y: 164, width: 463, height: 262 },
+    display: { x: 126, y: 205, width: 411, height: 201 },
+    annunciators: { x: 126, y: 173, width: 411, height: 26 },
     power: { x: 46, y: 837 }
   },
   "39gs": {
     label: "HP 39gs", rom: "rom.39g", romSize: 1_048_576,
     kml: "real39gs-lc.kml", skin: "hp39gs.svg",
     kmlWidth: 444, kmlHeight: 887, lcdHeight: 64,
-    display: { x: 100, y: 164, width: 463, height: 262 },
+    display: { x: 126, y: 205, width: 411, height: 201 },
+    annunciators: { x: 126, y: 173, width: 411, height: 26 },
     power: { x: 46, y: 838 }
   },
   "40gs": {
     label: "HP 40gs", rom: "rom.39g", romSize: 1_048_576,
     kml: "real40gs-lc.kml", skin: "hp40gs.svg",
     kmlWidth: 444, kmlHeight: 889, lcdHeight: 64,
-    display: { x: 100, y: 164, width: 463, height: 262 },
+    display: { x: 126, y: 205, width: 411, height: 201 },
+    annunciators: { x: 126, y: 173, width: 411, height: 26 },
     power: { x: 51, y: 839 }
   },
   "48gii": {
@@ -131,6 +136,11 @@ const startButton = requiredElement<HTMLButtonElement>("start");
 const resetButton = requiredElement<HTMLButtonElement>("reset");
 const calculator = requiredElement<HTMLElement>("calculator");
 const skin = requiredElement<HTMLElement>("skin");
+const annunciators = document.getElementById("annunciators") as unknown as SVGSVGElement;
+if (!annunciators) throw new Error("Missing #annunciators");
+const annunciatorIcons = Array.from(
+  annunciators.querySelectorAll<SVGGraphicsElement>("[data-bit]")
+);
 const canvas = requiredElement<HTMLCanvasElement>("lcd");
 const ctx = canvas.getContext("2d", { alpha: false })!;
 const runtimeBadge = requiredElement<HTMLElement>("runtime-badge");
@@ -186,6 +196,23 @@ function setResetEnabled(enabled: boolean): void {
 
 function formatMiB(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(bytes % 1_048_576 === 0 ? 0 : 2)} MiB`;
+}
+
+function clearAnnunciators(): void {
+  for (const icon of annunciatorIcons) icon.classList.remove("is-on");
+}
+
+function refreshAnnunciators(): void {
+  if (!running || !moduleInstance || !selectedModel().annunciators) {
+    clearAnnunciators();
+    return;
+  }
+
+  const state = moduleInstance._webemu48_annunciators();
+  for (const icon of annunciatorIcons) {
+    const bit = Number(icon.dataset.bit ?? "0");
+    icon.classList.toggle("is-on", bit !== 0 && (state & bit) !== 0);
+  }
 }
 
 function paintLcdBackground(model: ModelConfig): void {
@@ -254,6 +281,17 @@ async function applyModelVisual(): Promise<void> {
   canvas.style.top = `${(model.display.y / VIEWBOX_HEIGHT) * 100}%`;
   canvas.style.width = `${(model.display.width / VIEWBOX_WIDTH) * 100}%`;
   canvas.style.height = `${(model.display.height / VIEWBOX_HEIGHT) * 100}%`;
+
+  if (model.annunciators) {
+    annunciators.style.left = `${(model.annunciators.x / VIEWBOX_WIDTH) * 100}%`;
+    annunciators.style.top = `${(model.annunciators.y / VIEWBOX_HEIGHT) * 100}%`;
+    annunciators.style.width = `${(model.annunciators.width / VIEWBOX_WIDTH) * 100}%`;
+    annunciators.style.height = `${(model.annunciators.height / VIEWBOX_HEIGHT) * 100}%`;
+    annunciators.removeAttribute("hidden");
+  } else {
+    annunciators.setAttribute("hidden", "");
+  }
+  clearAnnunciators();
   paintLcdBackground(model);
 
   startButton.textContent = `Start ${model.label}`;
@@ -562,6 +600,7 @@ async function resetCalculator(): Promise<void> {
   activePointerVisualKey = null;
 
   running = false;
+  clearAnnunciators();
   paintLcdBackground(model);
   setSessionStatus(`Resetting ${model.label}…`);
   writeLog(`Resetting ${model.label}.`);
@@ -601,6 +640,12 @@ async function resetCalculator(): Promise<void> {
 function renderLoop(): void {
   if (!running || !moduleInstance) return;
 
+  refreshAnnunciators();
+
+  /*
+   * webemu48_lcd_refresh() is deliberately non-blocking. If the emulator
+   * worker owns the LCD lock, leave the previous canvas frame in place.
+   */
   if (moduleInstance._webemu48_lcd_refresh()) {
     const width = moduleInstance._webemu48_lcd_width();
     const height = moduleInstance._webemu48_lcd_height();

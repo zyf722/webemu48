@@ -782,6 +782,7 @@ extern BOOL SetThreadPriority(HANDLE hThread, int nPriority);
 
 extern void InitializeCriticalSection(CRITICAL_SECTION * lpCriticalSection);
 extern void EnterCriticalSection(CRITICAL_SECTION *);
+extern BOOL TryEnterCriticalSection(CRITICAL_SECTION *);
 extern void LeaveCriticalSection(CRITICAL_SECTION *);
 extern void DeleteCriticalSection(CRITICAL_SECTION * lpCriticalSection);
 

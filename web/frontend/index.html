@@ -56,6 +56,32 @@
       <section class="stage-card" aria-label="Calculator">
         <div id="calculator" tabindex="0" aria-label="HP 39g+ calculator">
           <div id="skin" aria-hidden="true"></div>
+          <svg
+            id="annunciators"
+            viewBox="0 0 393 18"
+            aria-hidden="true"
+            hidden
+          >
+            <g class="annunciator" data-bit="1" transform="translate(12 9)">
+              <path d="M8 -5H-2V-8L-8 -3l6 5v-3H8" />
+            </g>
+            <g class="annunciator" data-bit="2" transform="translate(75 9)">
+              <path d="M-8 -5H2V-8L8 -3 2 2v-3H-8" />
+            </g>
+            <g class="annunciator annunciator-alpha" data-bit="4" transform="translate(148 9)">
+              <text x="0" y="5">α</text>
+            </g>
+            <g class="annunciator" data-bit="8" transform="translate(218 9)">
+              <circle cx="0" cy="0" r="1.6" />
+              <path d="M-4 -4Q-8 0-4 4M4 -4Q8 0 4 4M-8 -6Q-13 0-8 6M8 -6Q13 0 8 6" fill="none" />
+            </g>
+            <g class="annunciator" data-bit="16" transform="translate(283 9)">
+              <path d="M-6 -7H6M-6 7H6M-5 -6C-5 -2-2 -2 0 0 2 -2 5 -2 5 -6M-5 6C-5 2-2 2 0 0 2 2 5 2 5 6" fill="none" />
+            </g>
+            <g class="annunciator" data-bit="32" transform="translate(352 9)">
+              <path d="M-9 -4H6M3 -7 7 -4 3 -1M9 4H-6M-3 1-7 4-3 7" fill="none" />
+            </g>
+          </svg>
           <canvas id="lcd" width="131" height="64" aria-label="Calculator LCD"></canvas>
         </div>
       </section>

@@ -17,7 +17,14 @@ BOOL WebCopyLcdRgba(BYTE *destination, UINT destinationSize)
     if (!destination || !pbyLcd || destinationSize < required)
         return FALSE;
 
-    EnterCriticalSection(&csLcdLock);
+    /*
+     * The browser calls this from requestAnimationFrame on the UI thread.
+     * Never block that thread behind the emulator's LCD worker; if a frame
+     * is being updated, keep the previous browser frame and try again later.
+     */
+    if (!TryEnterCriticalSection(&csLcdLock))
+        return FALSE;
+
     {
         const UINT headerRows =
             (Chipset.d0size < height) ? Chipset.d0size : height;

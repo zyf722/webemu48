@@ -940,6 +940,10 @@ void EnterCriticalSection(CRITICAL_SECTION *lock) {
 	pthread_mutex_lock(lock);
 }
 
+BOOL TryEnterCriticalSection(CRITICAL_SECTION *lock) {
+	return pthread_mutex_trylock(lock) == 0;
+}
+
 void LeaveCriticalSection(CRITICAL_SECTION *lock) {
 	pthread_mutex_unlock(lock);
 }

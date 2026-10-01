@@ -331,6 +331,27 @@ int webemu48_lcd_height(void)
 }
 
 WEBEMU48_EXPORT
+int webemu48_annunciators(void)
+{
+    if (!bDocumentAvail)
+        return 0;
+
+    BYTE state = (BYTE)(
+        Chipset.IORam[ANNCTRL] |
+        (Chipset.IORam[ANNCTRL + 1] << 4)
+    );
+
+    /*
+     * Match UpdateAnnunciators(): the glass annunciators are dark when the
+     * annunciator master bit is off or timer 2 is stopped.
+     */
+    if ((state & AON) == 0 || (Chipset.IORam[TIMER2_CTRL] & RUN) == 0)
+        state = 0;
+
+    return state & 0x3F;
+}
+
+WEBEMU48_EXPORT
 int webemu48_display_on(void)
 {
     return (Chipset.IORam[BITOFFSET] & DON) != 0;

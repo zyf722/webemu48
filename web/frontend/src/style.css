@@ -216,13 +216,41 @@ h1 {
   transform: translateY(2px);
 }
 
+#annunciators {
+  position: absolute;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+  color: #1a2a24;
+}
+
+#annunciators .annunciator {
+  opacity: 0;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#annunciators .annunciator.is-on {
+  opacity: 1;
+}
+
+#annunciators .annunciator-alpha text {
+  fill: currentColor;
+  stroke: none;
+  font: 700 15px/1 Arial, sans-serif;
+  text-anchor: middle;
+}
+
 #lcd {
   position: absolute;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   pointer-events: none;
   background: #a8c0b0;
-  border-radius: 3.6% / 6.4%;
+  border-radius: 1px;
 }
 
 .side-panel { overflow: hidden; }
