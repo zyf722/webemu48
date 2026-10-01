@@ -20,6 +20,14 @@
 
 #include "ops.h"
 
+static __inline VOID RefreshDisp0Locked(VOID)
+{
+    EnterCriticalSection(&csLcdLock);
+    RefreshDisp0();
+    LeaveCriticalSection(&csLcdLock);
+}
+
+
 //
 // ROM buffer access functions
 //
@@ -434,9 +442,9 @@ VOID o80BExt(LPBYTE I) // Saturnator extentions
 	case 0x2C: w.carry = (cCurrentRomType == 'Q'); break; // it is big apple
 	case 0x2E: w.carry = (nCurrentClass == 50);    break; // it is big apple V2
 	case 0x30: w.d0address= Npack(w.C,5)>>12; Map(0,0xff); break; //config_disp0 Ca:address 4K data
-	case 0x31: w.d0address=0; Map(0,0xff); RefreshDisp0(); break; //unconfig_disp0 does the refresh
-	case 0x32: RefreshDisp0(); break; //refresh_disp0 force refresh
-	case 0x33: a= Npack(w.C,2); if (a>(DWORD)SCREENHEIGHT) a= SCREENHEIGHT; /* w.lcounter = (SCREENHEIGHT-a) */; w.d0size= a; RefreshDisp0(); break; //set_lines_disp0 nb in Cb
+	case 0x31: w.d0address=0; Map(0,0xff); RefreshDisp0Locked(); break; //unconfig_disp0 does the refresh
+	case 0x32: RefreshDisp0Locked(); break; //refresh_disp0 force refresh
+	case 0x33: a= Npack(w.C,2); if (a>(DWORD)SCREENHEIGHT) a= SCREENHEIGHT; /* w.lcounter = (SCREENHEIGHT-a) */; w.d0size= a; RefreshDisp0Locked(); break; //set_lines_disp0 nb in Cb
 	case 0x34: w.d0offset= Npack(w.C,5); w.d0offset &= 0x7FF; break; //set_offset_disp0 offset to disp in disp0
 	case 0x35: Nunpack(w.C,w.d0offset,5); break;			// native_get_line_disp0
 	case 0x38: w.HST |= I[5]; w.pc+=3; break; // ?HST=1.x not implemented

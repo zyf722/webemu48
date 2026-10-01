@@ -254,6 +254,7 @@ jobs:
               models: Array.from(document.querySelectorAll("#model option")).map(option => option.value),
               startDisabled: document.querySelector("#start")?.disabled,
               startText: document.querySelector("#start")?.textContent || "",
+              resetDisabled: document.querySelector("#reset")?.disabled,
               skin: document.querySelector("#skin")?.dataset.skin || "",
               skinViewBox: document.querySelector("#skin svg")?.getAttribute("viewBox") || "",
               interactiveKeyCount: interactiveKeys.length,
@@ -275,6 +276,7 @@ jobs:
           if (snapshot.models.join(",") !== expectedModels.join(",")) throw new Error("Unexpected model list: " + snapshot.models.join(","));
           if (snapshot.startDisabled) throw new Error("Start button stayed disabled");
           if (snapshot.startText !== "Start HP 50g") throw new Error("Model switch did not update Start button: " + snapshot.startText);
+          if (!snapshot.resetDisabled) throw new Error("Reset should be disabled before a calculator is running");
           if (snapshot.skin !== "hp50g.svg") throw new Error("Model switch did not install HP 50g SVG skin: " + snapshot.skin);
           if (snapshot.skinViewBox !== "0 0 665 1340") throw new Error("Unexpected SVG viewBox: " + snapshot.skinViewBox);
           if (snapshot.interactiveKeyCount < 50) throw new Error("Too few interactive SVG keys: " + snapshot.interactiveKeyCount);
@@ -372,11 +374,40 @@ jobs:
             );
           }
 
+          if (await evaluate('document.querySelector("#reset")?.disabled !== false')) {
+            throw new Error("Reset button did not enable after boot");
+          }
+
+          await evaluate(`(() => {
+            document.querySelector("#reset").click();
+            return document.querySelector("#session-status")?.textContent || "";
+          })()`);
+
+          const resetDeadline = Date.now() + 15000;
+          let resetStatus = "";
+          while (Date.now() < resetDeadline) {
+            resetStatus = await evaluate(
+              'document.querySelector("#session-status")?.textContent || ""'
+            );
+            if (resetStatus === "HP 39g+ is running.") break;
+            if (resetStatus.startsWith("Reset failed:")) {
+              throw new Error("Production reset failed: " + resetStatus);
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          if (resetStatus !== "HP 39g+ is running.") {
+            throw new Error("Timed out resetting production frontend: " + resetStatus);
+          }
+          if (await evaluate('document.querySelector("#reset")?.disabled !== false')) {
+            throw new Error("Reset button did not re-enable after reset");
+          }
+
           console.log("PASS frontend UI + ROM E2E", {
             ...snapshot,
             sessionStatus,
             lcdVaries,
-            keyboardState
+            keyboardState,
+            resetStatus
           });
           socket.close();
           NODE

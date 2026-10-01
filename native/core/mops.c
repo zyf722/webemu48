@@ -936,7 +936,12 @@ VOID Nwrite(BYTE *a, DWORD d, UINT s)
 				if ((p=WMap[u]) != NULL) memcpy(p+v, a, c);
 			}
 		}
-		if (!bGrayscale) UpdateDisplay(d, c); // update display
+		if (!bGrayscale)
+		{
+			EnterCriticalSection(&csLcdLock);
+			UpdateDisplay(d, c); // update display
+			LeaveCriticalSection(&csLcdLock);
+		}
 		a+=c;
 		d=(d+c)&0xFFFFF;
 	} while (s-=c);

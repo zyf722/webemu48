@@ -128,6 +128,7 @@ const romInput = requiredElement<HTMLInputElement>("rom");
 const romName = requiredElement<HTMLElement>("rom-name");
 const romHint = requiredElement<HTMLElement>("rom-hint");
 const startButton = requiredElement<HTMLButtonElement>("start");
+const resetButton = requiredElement<HTMLButtonElement>("reset");
 const calculator = requiredElement<HTMLElement>("calculator");
 const skin = requiredElement<HTMLElement>("skin");
 const canvas = requiredElement<HTMLCanvasElement>("lcd");
@@ -177,6 +178,10 @@ function setControlsEnabled(enabled: boolean): void {
   modelSelect.disabled = !enabled;
   romInput.disabled = !enabled;
   startButton.disabled = !enabled;
+}
+
+function setResetEnabled(enabled: boolean): void {
+  resetButton.disabled = !enabled;
 }
 
 function formatMiB(bytes: number): string {
@@ -519,6 +524,7 @@ async function startCalculator(): Promise<void> {
     await pressPowerOn(model);
 
     running = true;
+    setResetEnabled(true);
     calculator.focus({ preventScroll: true });
     setSessionStatus(`${model.label} is running.`);
     writeLog(`${model.label} started.`);
@@ -534,6 +540,61 @@ async function startCalculator(): Promise<void> {
     } else {
       setControlsEnabled(true);
     }
+  }
+}
+
+async function resetCalculator(): Promise<void> {
+  if (!moduleInstance || !running) return;
+
+  const model = selectedModel();
+  setResetEnabled(false);
+  releaseKeyboard();
+
+  if (activePointerButtonId !== null) {
+    moduleInstance._webemu48_button_id_up(activePointerButtonId);
+  } else if (activePressPoint) {
+    moduleInstance._webemu48_button_up(activePressPoint.x, activePressPoint.y);
+  }
+  activePointerVisualKey?.classList.remove("is-pointer-pressed");
+  activePointerId = null;
+  activePressPoint = null;
+  activePointerButtonId = null;
+  activePointerVisualKey = null;
+
+  running = false;
+  paintLcdBackground(model);
+  setSessionStatus(`Resetting ${model.label}…`);
+  writeLog(`Resetting ${model.label}.`);
+
+  try {
+    const requested = moduleInstance.ccall(
+      "webemu48_request_invalid", "number", [], []
+    );
+    if (!requested) throw new Error("Could not suspend the emulator core.");
+
+    await waitForState(1);
+
+    const reset = moduleInstance.ccall(
+      "webemu48_reset_cpu", "number", [], []
+    );
+    if (!reset) throw new Error("CPU reset was rejected.");
+
+    await waitForState(0);
+    await waitForShutdown();
+    await pressPowerOn(model);
+
+    running = true;
+    calculator.focus({ preventScroll: true });
+    setSessionStatus(`${model.label} is running.`);
+    writeLog(`${model.label} reset complete.`);
+    setResetEnabled(true);
+    requestAnimationFrame(renderLoop);
+  } catch (error) {
+    console.error(error);
+    const message = error instanceof Error ? error.message : String(error);
+    setSessionStatus(`Reset failed: ${message}`);
+    writeLog(`Reset failed: ${message}`);
+    writeLog("Reload the page to recover the emulator session.");
   }
 }
 
@@ -609,6 +670,7 @@ async function bootRuntime(): Promise<void> {
 
   setRuntimeStatus("Runtime ready.", "ready");
   setControlsEnabled(true);
+  setResetEnabled(false);
   log.textContent = "Runtime ready. Select a model and ROM image.";
 }
 
@@ -618,6 +680,7 @@ romInput.addEventListener("change", () => {
   romName.textContent = file ? `${file.name} · ${formatMiB(file.size)}` : "No ROM selected";
 });
 startButton.addEventListener("click", () => void startCalculator());
+resetButton.addEventListener("click", () => void resetCalculator());
 
 calculator.addEventListener("pointerdown", pointerDown);
 calculator.addEventListener("pointerup", releasePointer);

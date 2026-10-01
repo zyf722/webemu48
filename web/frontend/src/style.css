@@ -124,6 +124,12 @@ h1 {
   white-space: nowrap;
 }
 
+.run-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 .start-field button {
   border: 0;
   border-radius: 10px;
@@ -134,8 +140,16 @@ h1 {
   box-shadow: 0 8px 18px rgba(36,107,219,.22);
 }
 
+.start-field #reset {
+  min-width: 76px;
+  background: #eaf0f9;
+  color: #31415e;
+  box-shadow: none;
+}
+
 .start-field button:disabled {
   background: #9fb1cb;
+  color: #fff;
   cursor: default;
   box-shadow: none;
 }
@@ -195,22 +209,11 @@ h1 {
   cursor: pointer;
   transform-box: fill-box;
   transform-origin: center;
-  transition: transform 55ms ease-out, filter 55ms ease-out;
-}
-
-#skin #six-function-keys > g:hover,
-#skin #navigation > #up:hover,
-#skin #navigation > #left:hover,
-#skin #navigation > #right:hover,
-#skin #navigation > #down:hover,
-#skin #keyboard > g[id^="key-"]:hover {
-  filter: brightness(1.045);
 }
 
 #skin .is-pointer-pressed,
 #skin .is-keyboard-pressed {
-  transform: translateY(3px) scale(0.985);
-  filter: brightness(0.88);
+  transform: translateY(2px);
 }
 
 #lcd {

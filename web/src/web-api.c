@@ -22,6 +22,8 @@ extern void win32Init(void);
 extern BOOL buttonDown(int x, int y);
 extern void buttonUp(int x, int y);
 extern BOOL WebButtonById(UINT nId, BOOL bPressed);
+extern BOOL WebCopyLcdRgba(BYTE *destination, UINT destinationSize);
+extern UINT WebLcdHeight(VOID);
 
 extern CRITICAL_SECTION csGDILock;
 extern CRITICAL_SECTION csLcdLock;
@@ -147,6 +149,50 @@ static BOOL webemu48_request_run(void)
     return TRUE;
 }
 
+static BOOL webemu48_request_invalid_state(void)
+{
+    if (nState == SM_INVALID)
+        return TRUE;
+
+    if (nState == SM_RUN)
+    {
+        nNextState = SM_INVALID;
+        if (Chipset.Shutdn)
+            SetEvent(hEventShutdn);
+        else
+            bInterrupt = TRUE;
+        SuspendDebugger();
+        return TRUE;
+    }
+
+    if (nState == SM_SLEEP)
+    {
+        nNextState = SM_INVALID;
+        SetEvent(hEventShutdn);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+WEBEMU48_EXPORT
+int webemu48_request_invalid(void)
+{
+    if (!webemu48_initialized || !bDocumentAvail)
+        return FALSE;
+    return webemu48_request_invalid_state();
+}
+
+WEBEMU48_EXPORT
+int webemu48_reset_cpu(void)
+{
+    if (!webemu48_initialized || !bDocumentAvail || nState != SM_INVALID)
+        return FALSE;
+
+    CpuReset();
+    return webemu48_request_run();
+}
+
 WEBEMU48_EXPORT
 int webemu48_new_document(const char *kmlFilename, const char *baseDirectory)
 {
@@ -254,116 +300,16 @@ static BYTE webemu48_lcd_rgba_buffer[
     WEBEMU48_LCD_WIDTH * WEBEMU48_LCD_MAX_HEIGHT * 4
 ];
 
-static BYTE webemu48_binary_pixel(const BYTE *nibbles, int nibbleCount, int sourceX)
-{
-    if (!nibbles || sourceX < 0 || sourceX >= nibbleCount * 4)
-        return 0;
-
-    const BYTE nibble = nibbles[sourceX >> 2] & 0x0F;
-    return (nibble >> (sourceX & 3)) & 1;
-}
-
 WEBEMU48_EXPORT
 int webemu48_lcd_refresh(void)
 {
-    if (!hLcdDC || !hLcdDC->selectedBitmap ||
-        !hLcdDC->selectedBitmap->bitmapInfoHeader)
+    if (!bDocumentAvail)
         return FALSE;
 
-    const BITMAPINFOHEADER *header =
-        hLcdDC->selectedBitmap->bitmapInfoHeader;
-    const int sourceHeight = abs(header->biHeight);
-    if (sourceHeight <= 0 || sourceHeight > WEBEMU48_LCD_MAX_HEIGHT)
-        return FALSE;
-
-    HPALETTE palette = hLcdDC->realizedPalette ?
-        hLcdDC->realizedPalette : hLcdDC->selectedPalette;
-    const PALETTEENTRY *entries = NULL;
-    UINT entryCount = 0;
-    if (palette && palette->paletteLog) {
-        entries = palette->paletteLog->palPalEntry;
-        entryCount = palette->paletteLog->palNumEntries;
-    }
-
-    const BOOL displayOn = (Chipset.IORam[BITOFFSET] & DON) != 0;
-    const int headerRows = Chipset.d0size;
-    const int mainRows = MAINSCREENHEIGHT;
-    BYTE row[36];
-
-    /*
-     * The browser framebuffer is rebuilt directly from the emulated display
-     * memory instead of depending on the Win32 GDI compatibility bitmap.
-     * Native Emu48 maintains that bitmap incrementally; in the Web port the
-     * initial boot can leave it stale even though the ROM has a valid active
-     * display. Reconstructing 131x64/80 pixels is cheap and avoids GDI locks.
-     *
-     * This first browser bring-up uses the binary LCD path (palette indices
-     * 0/1), matching the default non-grayscale Emu48 mode.
-     */
-    for (int y = 0; y < sourceHeight; ++y) {
-        memset(row, 0, sizeof(row));
-
-        int sourceX = 0;
-        int nibbleCount = 0;
-
-        if (displayOn && y < headerRows && Chipset.d0memory) {
-            const BYTE *headerRow = Chipset.d0memory + y * 34;
-            memcpy(row, headerRow, 34);
-            sourceX = Chipset.d0offset;
-            nibbleCount = 34;
-        } else if (displayOn && y < headerRows + mainRows) {
-            const DWORD address =
-                Chipset.start1 + (DWORD)(y - headerRows) * Chipset.width;
-            Npeek(row, address, 36);
-            sourceX = Chipset.boffset;
-            nibbleCount = 36;
-        } else if (displayOn && y < headerRows + mainRows + MENUHEIGHT) {
-            const DWORD address =
-                Chipset.start2 +
-                (DWORD)(y - headerRows - mainRows) * 34;
-            Npeek(row, address, 34);
-            sourceX = 0;
-            nibbleCount = 34;
-        }
-
-        for (int x = 0; x < WEBEMU48_LCD_WIDTH; ++x) {
-            const BYTE index = nibbleCount ?
-                webemu48_binary_pixel(row, nibbleCount, sourceX + x) : 0;
-
-            BYTE red;
-            BYTE green;
-            BYTE blue;
-            if (entries && index < entryCount) {
-                red = entries[index].peRed;
-                green = entries[index].peGreen;
-                blue = entries[index].peBlue;
-            } else {
-                /*
-                 * Match the default LCD background from the bundled HP ARM
-                 * KML files instead of flashing pure white before a palette
-                 * has been realized. Lit pixels fall back to black.
-                 */
-                if (index) {
-                    red = green = blue = 0;
-                } else {
-                    red = 168;
-                    green = 192;
-                    blue = 176;
-                }
-            }
-
-            BYTE *destination =
-                &webemu48_lcd_rgba_buffer[
-                    (y * WEBEMU48_LCD_WIDTH + x) * 4
-                ];
-            destination[0] = red;
-            destination[1] = green;
-            destination[2] = blue;
-            destination[3] = 255;
-        }
-    }
-
-    return TRUE;
+    return WebCopyLcdRgba(
+        webemu48_lcd_rgba_buffer,
+        sizeof(webemu48_lcd_rgba_buffer)
+    );
 }
 
 WEBEMU48_EXPORT
@@ -381,10 +327,7 @@ int webemu48_lcd_width(void)
 WEBEMU48_EXPORT
 int webemu48_lcd_height(void)
 {
-    if (!hLcdDC || !hLcdDC->selectedBitmap ||
-        !hLcdDC->selectedBitmap->bitmapInfoHeader)
-        return 0;
-    return abs(hLcdDC->selectedBitmap->bitmapInfoHeader->biHeight);
+    return bDocumentAvail ? (int) WebLcdHeight() : 0;
 }
 
 WEBEMU48_EXPORT
